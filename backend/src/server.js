@@ -1,0 +1,54 @@
+import dotenv from 'dotenv'; 
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+
+import patientRoutes from './routes/patient.routes.js';
+
+dotenv.config();
+
+const app = express();
+
+
+app.use(helmet());
+app.use(cors());
+app.use(morgan('dev'));
+app.use(express.json());
+
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'OK',
+        message: 'EHR System API is Running',
+        time: new Date().toISOString()
+    });
+});
+
+app.use('/api/patients', patientRoutes);
+
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `Route ${req.method} ${req.url} not found`
+    });
+});
+
+app.use((err, req, res, next) => {
+    console.error('Server Error:', err.message);
+    res.status(500).json({
+        success: false,
+        message: 'Internal Server Error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+    console.log(`\n EHR API Server running`);
+    console.log(`URL: http://localhost:${PORT}`);
+    console.log(`Health: http://localhost:${PORT}/health\n`);
+    console.log(`Patients: http://localhost:${PORT}/api/patients`);
+    console.log(`\n Waiting for requests... \n`);
+})

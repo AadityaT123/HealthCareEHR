@@ -1,4 +1,4 @@
-import patient from '../models/patient.model.js';
+import { createPatient } from '../models/patient.model.js';
 
 let patients = [
     {
@@ -29,7 +29,7 @@ let patients = [
 
 
 const getAllPatients = (req, res) => {
-    res.status(200),json({
+    res.status(200).json({
         success: true,
         count: patients.length,
         data: patients
@@ -55,16 +55,16 @@ const getPatientById = (req, res) => {
 const createNewPatient = (req, res) => {
     const { firstName, lastName, dateOfBirth, gender, email, phone, address } = req.body;
 
-    if(!firstName || !lastName || !dateOfBirth || !gender || phone ) {
+    if(!firstName || !lastName || !dateOfBirth || !gender || !phone ) {
         return res.status(400).json({
             success: false,
             message: 'firstName, lastName, dateOfBirth, gender and phone are required'
         });
     }
-    const newPatient = createNewPatient({ firstName, lastName, dateOfBirth, gender, email, phone, address });
+    const newPatient = createPatient({ firstName, lastName, dateOfBirth, gender, email, phone, address });
     patients.push(newPatient);
 
-    res.status(301).json({
+    res.status(201).json({
         success: true,
         message: 'Patient created Successfully',
         data: newPatient
@@ -94,7 +94,7 @@ const updatePatient = (req, res) => {
     });
 };
 
-const deletPAtient = (req, res) => {
+const deletePatient = (req, res) => {
     const index = patients.findIndex(p => p.id === req.params.id);
 
     if(index === -1){
@@ -113,4 +113,4 @@ const deletPAtient = (req, res) => {
     });
 };
 
-export { getAllPatients, getPatientById, createNewPatient, updatePatient, deletPAtient };
+export { getAllPatients, getPatientById, createNewPatient, updatePatient, deletePatient };

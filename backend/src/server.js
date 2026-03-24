@@ -1,15 +1,13 @@
-import dotenv from 'dotenv'; 
+import 'dotenv/config'; 
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 
-import patientRoutes from './routes/patient.routes.js';
-
-dotenv.config();
+import patientRoutes from './routes/patient.route.js';
+import appointmentRoutes from './routes/appointment.route.js';
 
 const app = express();
-
 
 app.use(helmet());
 app.use(cors());
@@ -26,6 +24,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/patients', patientRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 app.use((req, res) => {
     res.status(404).json({

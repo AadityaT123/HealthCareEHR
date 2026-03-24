@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "EHR system Backend API",
   "license": "ISC",
-  "author": "Aadarsh Agrawal, Aayush Nema, Abhisek Tiwari, Abhay Bhargav, Aadarsh Singh Jadon, Abhisek Hardia, Aaditya Baghel, Aaditya Trivedi, Aashish Badal",
+  "author": "Aadarsh Agrawal, Aayush Nema, Abhisek Tiwari, Abhay Bhargav, Aadarsh Singh Jadon, Abhisek Hardia, Aaditya Baghel, Aaditya Trivedi, Aashish Badal, Vinayak Mishra",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

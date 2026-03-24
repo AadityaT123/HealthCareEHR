@@ -1,4 +1,4 @@
-const createPatient = ({ firstName, lastName, dateOfBirt, gender, email, phone, address }) => {
+const createPatient = ({ firstName, lastName, dateOfBirth, gender, email, phone, address }) => {
     return {
         id: Date.now().toString(),
         firstName,

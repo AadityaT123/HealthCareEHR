@@ -6,6 +6,11 @@ import morgan from 'morgan';
 
 import patientRoutes from './routes/patient.route.js';
 import appointmentRoutes from './routes/appointment.route.js';
+import authRoutes from "./routes/auth.route.js";
+import roleRoutes from "./routes/role.route.js";
+import errorHandler from "./middlewares/errorHandler.middleware.js";
+
+dotenv.config();
 
 const app = express();
 
@@ -25,6 +30,11 @@ app.get('/health', (req, res) => {
 
 app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/roles", roleRoutes);
+
+
+app.use(errorHandler);
 
 app.use((req, res) => {
     res.status(404).json({
@@ -45,9 +55,9 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`\n EHR API Server running`);
-    console.log(`URL: http://localhost:${PORT}`);
-    console.log(`Health: http://localhost:${PORT}/health\n`);
-    console.log(`Patients: http://localhost:${PORT}/api/patients`);
-    console.log(`\n Waiting for requests... \n`);
-})
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Patients:     http://localhost:${PORT}/api/patients`);
+    console.log(`Appointments: http://localhost:${PORT}/api/appointments`);
+    console.log(`Auth:         http://localhost:${PORT}/api/auth`);
+    console.log(`Roles:        http://localhost:${PORT}/api/roles`);
+});

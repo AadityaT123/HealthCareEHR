@@ -20,14 +20,14 @@ const getAppointmentById = (req, res ) => {
 };
 
 const createAppointmentHandler = (req, res ) => {
-    const { patientId, doctorId, date, time, type, status, notes  } = req.body;
+    const { patientId, doctorId, appointmentDate, time, appointmentType, status, notes  } = req.body;
 
     const missing = [];
     if(!patientId) missing.push("patientId");
     if(!doctorId) missing.push("doctorId");
-    if(!date) missing.push("date");
+    if(!appointmentDate) missing.push("appointmentDate");
     if(!time) missing.push("time");
-    if(!type) missing.push("type");
+    if(!appointmentType) missing.push("appointmentType");
 
     if(missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
@@ -35,14 +35,14 @@ const createAppointmentHandler = (req, res ) => {
     const validTypes = ["Consultation", "Follow-up", "Emergency", "Routine Checkup"];
     const validStatuses = ["Scheduled", "Completed", "Cancelled" ];
 
-    if(!validTypes.includes(type))
+    if(!validTypes.includes(appointmentType))
         return res.status(400).json({ success: false, message: `Invalid type. Must be one of: ${validTypes.join(", ")}` });
 
     const appointmentStatus = status || "Scheduled";
     if(!validStatuses.includes(appointmentStatus))
         return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
 
-    const appointment = createAppointment({ patientId, doctorId, date, time, type, status: appointmentStatus, notes });
+    const appointment = createAppointment({ patientId, doctorId, appointmentDate, time, appointmentType, status: appointmentStatus, notes });
     appointments.push(appointment);
 
     res.status(201).json({ success: true, data: appointment });

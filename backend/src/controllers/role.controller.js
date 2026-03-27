@@ -1,13 +1,14 @@
 import { createRole } from '../models/role.model.js';
+import { roles } from '../data/store.data.js';
 
-let roles = [
-    { id: "1", roleName: "Admin", description: "Full System Access" },
-    { id: "2", roleName: "Doctor", description: "Clinical documentation and orders" },
-    { id: "3", roleName: "Nurse", description: "Medication administration and notes" },
-    { id: "4", roleName: "Pharmacist", description: "Medication Management" },
-    { id: "5", roleName: "Lab Technician", description: "Lab orders and results" },
-    { id: "6", roleName: "Receptionist", description: "Patient registration and appointments" }
-];
+// let roles = [
+//     { id: "1", roleName: "Admin", description: "Full System Access" },
+//     { id: "2", roleName: "Doctor", description: "Clinical documentation and orders" },
+//     { id: "3", roleName: "Nurse", description: "Medication administration and notes" },
+//     { id: "4", roleName: "Pharmacist", description: "Medication Management" },
+//     { id: "5", roleName: "Lab Technician", description: "Lab orders and results" },
+//     { id: "6", roleName: "Receptionist", description: "Patient registration and appointments" }
+// ];
 
 const getAllRoles = (req, res) => {
     res.status(200).json({ success: true, count: roles.length, data: roles });

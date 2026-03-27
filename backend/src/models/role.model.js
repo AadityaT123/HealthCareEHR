@@ -1,5 +1,3 @@
-import { updateAppointment } from "../controllers/appointment.controller"
-
 const createRole = ({ roleName, description }) => {
     return {
         id: Date.now().toString(),
@@ -10,4 +8,4 @@ const createRole = ({ roleName, description }) => {
     };
 };
 
-export { createRole };
+export { createRole };  

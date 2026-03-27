@@ -6,7 +6,7 @@ const createUser = ({ username, passwordHash, roleId }) => {
         roleId,
         isActive: true,
         createdAt: new Date().toISOString(),
-        updatedAt: new Data().toISOString()
+        updatedAt: new Date().toISOString()
     };
 };
 

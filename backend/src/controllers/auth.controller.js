@@ -1,8 +1,7 @@
-import bycrypt from "bycryptjs";
+import bycrypt from "bcryptjs";
 import jwt from 'jsonwebtoken';
 import { createUser } from '../models/user.model.js';
-
-let users = [];
+import { roles, users } from '../data/store.data.js';       
 
 const JWT_SECRET = process.env.JWT_SECRET || 'ehr_secret_key';
 const JWT_EXPIRES_IN = '40min';
@@ -16,12 +15,13 @@ const register = async (req, res) => {
     if( !roleId) missing.push("roleId");
 
     if(missing.length > 0)
-        return res.staus(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
+        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-    const existingUser = users.find(u => username.toLowerCase() === username.toLowerCase());
+    const existingUser = users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if(existingUser) 
         return res.status(409).json({ success: false, message: "USername already exists" });
 
+    const roleExists = roles.find(r => r.id === roleId);
     if(!roleExists)
         return res.status(400).json({ success: false, message: "Invalid roleId - role does not exists" });
 
@@ -102,4 +102,4 @@ const deactivateUser = (req, res) => {
     res.status(200).json({ success: true, message: "User deactivated successfully" });
 };
 
-export { register, login, getMe, deactivateUser, users };
+export { register, login, getMe, deactivateUser };

@@ -1,31 +1,32 @@
 import { createPatient } from '../models/patient.model.js';
+import { patients } from '../data/store.data.js';
 
-let patients = [
-    {
-        id: '1',
-        firstName: 'Test',
-        lastName: 'Case 1',
-        dateOfBirth: '1990-05-14',
-        gender: 'Male',
-        email: 'test.case1@example.com',
-        phone: '000000000',
-        address: '123 123 ABC Street',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    },
-    {
-        id: '2',
-        firstName: 'Test',
-        lastName: 'Case 2',
-        dateOfBirth: '1990-05-14',
-        gender: 'Male',
-        email: 'test.case2@example.com',
-        phone: '000000010',
-        address: '123 ABC Street',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    }
-];
+// let patients = [
+//     {
+//         id: '1',
+//         firstName: 'Test',
+//         lastName: 'Case 1',
+//         dateOfBirth: '1990-05-14',
+//         gender: 'Male',
+//         email: 'test.case1@example.com',
+//         phone: '000000000',
+//         address: '123 123 ABC Street',
+//         createdAt: new Date().toISOString(),
+//         updatedAt: new Date().toISOString()
+//     },
+//     {
+//         id: '2',
+//         firstName: 'Test',
+//         lastName: 'Case 2',
+//         dateOfBirth: '1990-05-14',
+//         gender: 'Male',
+//         email: 'test.case2@example.com',
+//         phone: '000000010',
+//         address: '123 ABC Street',
+//         createdAt: new Date().toISOString(),
+//         updatedAt: new Date().toISOString()
+//     }
+// ];
 
 
 const getAllPatients = (req, res) => {

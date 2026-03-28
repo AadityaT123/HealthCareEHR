@@ -11,3 +11,4 @@ export const users = [];
 export const patients = [];
 export const appointments = [];
 export const doctors = [];
+export const medications = [];

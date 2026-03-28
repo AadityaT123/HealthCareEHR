@@ -66,7 +66,7 @@ const login = async(req, res) => {
         { 
             userId: user.id,
             username: user.username,
-            roleID: user.roleId,
+            roleId: user.roleId,
             roleName: role?.roleName
         },
         JWT_SECRET,

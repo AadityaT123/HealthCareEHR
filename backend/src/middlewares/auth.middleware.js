@@ -3,9 +3,9 @@ import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET || "ehr_secret_key";
 
 const protect = (req, res, next) => {
-    const authHeader = req.header.authoriszation;
+    const authHeader = req.headers.authorization;
 
-    if(!authHeader || authHeader.startsWith("Bearer "))
+    if(!authHeader || !authHeader.startsWith("Bearer "))
         return res.status(401).json({ success: false, message: "No token provided - authorization denied" });
 
     const token = authHeader.split(" ")[1];
@@ -15,7 +15,7 @@ const protect = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (err) {
-        return res.status(401).json ({ success: false, message: "Invlaid or expired token" });
+        return res.status(401).json ({ success: false, message: "Invalid or expired token" });
     }
 };
 

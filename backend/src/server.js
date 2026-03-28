@@ -10,6 +10,7 @@ import authRoutes from "./routes/auth.route.js";
 import roleRoutes from "./routes/role.route.js";
 import doctorRoutes from "./routes/doctor.route.js";
 import errorHandler from "./middlewares/errorHandler.middleware.js";
+import medicationRoutes from "./routes/medication.route.js";
 
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/appointments', appointmentRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/roles", roleRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/medications', medicationRoutes);
 
 
 app.use(errorHandler);
@@ -62,4 +64,5 @@ app.listen(PORT, () => {
     console.log(`Auth: http://localhost:${PORT}/api/auth`);
     console.log(`Roles: http://localhost:${PORT}/api/roles`);
     console.log(`Doctors: http://localhost:${PORT}/api/doctors`);
+    console.log(`Medications: http://localhost:${PORT}/api/medications`);
 });

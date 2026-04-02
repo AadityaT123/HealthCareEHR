@@ -4,9 +4,8 @@ const createAppointment = ({ patientId, doctorId, date, time, type, status, note
         patientId,
         doctorId,
         appointmentDate,
-        time,
         appointmentType,
-        status,
+        status: status || "Scheduled",
         notes: notes || "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()

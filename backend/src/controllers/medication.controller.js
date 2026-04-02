@@ -1,5 +1,5 @@
-import { createMedication } from "../models/medication.model";
-import { medications } from "../data/store.data";
+import { createMedication } from "../models/medication.model.js";
+import { medications } from "../data/store.data.js";
 
 const getAllMedications = (req, res) => {
     const { category, name }= req.query;
@@ -32,7 +32,7 @@ const createMedicationHandler = (req, res) => {
     if(!category) missing.push("category");
 
     if(missing.length > 0)
-        return res.status(400).json({ success: false, message: `Missing required field ${missing.joim(", ")}` });
+        return res.status(400).json({ success: false, message: `Missing required field ${missing.join(", ")}` });
     
     const exists = medications.find(m => m.medicationName.toLowerCase() === medicationName.toLowerCase() && m.dosage.toLowerCase() === dosage.toLowerCase());
     if(exists)
@@ -41,7 +41,7 @@ const createMedicationHandler = (req, res) => {
     if(sideEffects && !Array.isArray(sideEffects))
         return res.status(400).json({ success: false, message: "sideEffects must be an array" });
     if(contraindications && !Array.isArray(contraindications))
-        return res.status(409).json({ success: false, message: "contraindications must be an array" });
+        return res.status(400).json({ success: false, message: "contraindications must be an array" });
 
     const medication = createMedication({ medicationName, dosage, instructions, category, sideEffects, contraindications });
     medications.push(medication);
@@ -54,10 +54,10 @@ const updateMedication = (req, res) => {
     if(index === -1)
         return res.status(404).json({ success: false, message: "Medication not found" });
 
-    if(req.body.sideEffects && !Array(req.body.sideEffects))
+    if(req.body.sideEffects && !Array.isArray(req.body.sideEffects))
         return res.status(400).json({ success: false, message: "sideEffects must be an array" });
     
-    if(req.body.contraindications && !Array(req.body.contraindications))
+    if(req.body.contraindications && !Array.isArray(req.body.contraindications))
         return res.status(400).json({ success: false, message: "contraindications must be an array" });
 
     medications[index] = {
@@ -83,4 +83,4 @@ const deleteMedication = (req, res) => {
     res.status(200).json({ success: true, message: "Medication deactivated successfully"});
 };
 
-export default { getAllMedications, getMedicationById, createMedicationHandler, updateMedication, deleteMedication };
+export { getAllMedications, getMedicationById, createMedicationHandler, updateMedication, deleteMedication };

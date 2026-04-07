@@ -6,8 +6,8 @@ const getAllEncounterNotes = (req, res) => {
     const { patientId, doctorId, appointmentId } = req.query;
 
     let result = encounterNotes;
-    if (patientId)     result = result.filter(e => e.patientId === patientId);
-    if (doctorId)      result = result.filter(e => e.doctorId === doctorId);
+    if (patientId) result = result.filter(e => e.patientId === patientId);
+    if (doctorId) result = result.filter(e => e.doctorId === doctorId);
     if (appointmentId) result = result.filter(e => e.appointmentId === appointmentId);
 
     res.status(200).json({ success: true, count: result.length, data: result });
@@ -48,13 +48,13 @@ const createEncounterNoteHandler = (req, res) => {
 
     // Required field validation
     const missing = [];
-    if (!patientId)      missing.push("patientId");
-    if (!doctorId)       missing.push("doctorId");
-    if (!appointmentId)  missing.push("appointmentId");
-    if (!encounterDate)  missing.push("encounterDate");
+    if (!patientId) missing.push("patientId");
+    if (!doctorId) missing.push("doctorId");
+    if (!appointmentId) missing.push("appointmentId");
+    if (!encounterDate) missing.push("encounterDate");
     if (!chiefComplaint) missing.push("chiefComplaint");
-    if (!diagnosis)      missing.push("diagnosis");
-    if (!treatmentPlan)  missing.push("treatmentPlan");
+    if (!diagnosis) missing.push("diagnosis");
+    if (!treatmentPlan) missing.push("treatmentPlan");
 
     if (missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
@@ -91,7 +91,7 @@ const createEncounterNoteHandler = (req, res) => {
     // Update appointment status to Completed
     const appointmentIndex = appointments.findIndex(a => a.id === appointmentId);
     if (appointmentIndex !== -1) {
-        appointments[appointmentIndex].status    = "Completed";
+        appointments[appointmentIndex].status = "Completed";
         appointments[appointmentIndex].updatedAt = new Date().toISOString();
     }
 
@@ -107,12 +107,12 @@ const updateEncounterNote = (req, res) => {
     encounterNotes[index] = {
         ...encounterNotes[index],
         ...req.body,
-        id:            encounterNotes[index].id,
-        patientId:     encounterNotes[index].patientId,     // prevent FK override
-        doctorId:      encounterNotes[index].doctorId,      // prevent FK override
+        id: encounterNotes[index].id,
+        patientId: encounterNotes[index].patientId,     // prevent FK override
+        doctorId: encounterNotes[index].doctorId,      // prevent FK override
         appointmentId: encounterNotes[index].appointmentId, // prevent FK override
-        createdAt:     encounterNotes[index].createdAt,
-        updatedAt:     new Date().toISOString()
+        createdAt: encounterNotes[index].createdAt,
+        updatedAt: new Date().toISOString()
     };
 
     res.status(200).json({ success: true, data: encounterNotes[index] });
@@ -137,3 +137,8 @@ export {
     updateEncounterNote,
     deleteEncounterNote
 };
+
+// First commit sample
+//second commit sample
+//third commit sample
+//fourth commit sample

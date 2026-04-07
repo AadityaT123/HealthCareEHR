@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import 'dotenv/config';
 
+import { connectDB } from "./config/database.js";
+
 import patientRoutes from './routes/patient.route.js';
 import appointmentRoutes from './routes/appointment.route.js';
 import authRoutes from "./routes/auth.route.js";
@@ -67,17 +69,24 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Patients: http://localhost:${PORT}/api/patients`);
-    console.log(`Appointments: http://localhost:${PORT}/api/appointments`);
-    console.log(`Auth: http://localhost:${PORT}/api/auth`);
-    console.log(`Roles: http://localhost:${PORT}/api/roles`);
-    console.log(`Doctors: http://localhost:${PORT}/api/doctors`);
-    console.log(`Medications: http://localhost:${PORT}/api/medications`);
-    console.log(`Medical History: http://localhost:${PORT}/api/medical-history`);
-    console.log(`Encounters: http://localhost:${PORT}/api/encounters`);
-    console.log(`Prescriptions: http://localhost:${PORT}/api/prescriptions`);
-    console.log(`Lab Orders: http://localhost:${PORT}/api/lab-orders`);
-    console.log(`Lab Results: http://localhost:${PORT}/api/lab-results`);
-});
+const startServer = async() => {
+    await connectDB();
+
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Health: http://localhost:${PORT}/health`);
+        console.log(`Auth: http://localhost:${PORT}/api/auth`);
+        console.log(`Roles: http://localhost:${PORT}/api/roles`);
+        console.log(`Patients: http://localhost:${PORT}/api/patients`);
+        console.log(`Appointments: http://localhost:${PORT}/api/appointments`);
+        console.log(`Doctors: http://localhost:${PORT}/api/doctors`);
+        console.log(`Medications: http://localhost:${PORT}/api/medications`);
+        console.log(`Medical History: http://localhost:${PORT}/api/medical-history`);
+        console.log(`Encounters: http://localhost:${PORT}/api/encounters`);
+        console.log(`Prescriptions: http://localhost:${PORT}/api/prescriptions`);
+        console.log(`Lab Orders: http://localhost:${PORT}/api/lab-orders`);
+        console.log(`Lab Results: http://localhost:${PORT}/api/lab-results`);
+    });
+};
+
+startServer();

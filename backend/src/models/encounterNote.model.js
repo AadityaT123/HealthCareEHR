@@ -1,5 +1,3 @@
-import { appointments } from "../data/store.data";
-
 const createEncounterNote = ({ 
     patientId,
     doctorId,

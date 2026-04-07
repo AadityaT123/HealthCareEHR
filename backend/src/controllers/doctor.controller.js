@@ -13,7 +13,7 @@ const getAllDoctors = (req, res) => {
 };
 
 const getDoctorById = (req, res) => {
-    const doctor = doctor.find(d => d.id === req.params.id );
+    const doctor = doctors.find(d => d.id === req.params.id );
     if(!doctor)  
         return res.status(404).json({ success: false, message: "Doctor not found" });
 
@@ -54,7 +54,7 @@ const updateDoctor = (req, res) => {
     if(index === -1)
         return res.status(404).json({ success: false, message: "Doctor not found" });
 
-    if(req.bosy.licenseNumber){
+    if(req.body.licenseNumber){
         const duplicate = doctors.find(d => d.licenseNumber === req.body.licenseNumber && d.id !== req.params.id);
         if(duplicate)
             return res.status(409).json({ success: false, message: "License number already exists" });

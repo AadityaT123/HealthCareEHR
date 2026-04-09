@@ -1,23 +1,41 @@
-const createPatient = ({ firstName, lastName, dateOfBirth, gender, contactInformation, insuranceDetails }) => {
-    return {
-        id: Date.now().toString(),
-        firstName,
-        lastName,
-        dateOfBirth,
-        gender,
-        contactInformation: {
-            email: contactInformation?.email || "",
-            phone: contactInformation?.phone || "",
-            address: contactInformation?.address || ""
-        },
-        insuranceDetails: {
-            provider: insuranceDetails?.provider || "",
-            policyNumber: insuranceDetails?.policyNumber || "",
-            groupNumber: insuranceDetails?.groupNumber || ""
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createPatient };
+const Patient = sequelize.define("Patient", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    firstName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    lastName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    dateOfBirth: {
+        type: DataTypes.DATEONLY,
+        allowNull: false
+    },
+    gender: {
+        type: DataTypes.ENUM("Male", "Female", "Other"),
+        allowNull: false
+    },
+    contactInformation: {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {}
+    },
+    insuranceDetails: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+        defaultValue: {}
+    }
+}, {
+    tableName: "patients",
+    timestamps: true
+});
+
+export default Patient;

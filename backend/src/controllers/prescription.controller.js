@@ -1,45 +1,80 @@
-import { createPrescription } from "../models/prescription.model.js";
-import { prescriptions, patients, doctors, medications } from "../data/store.data.js";
+import { Prescription, Patient, Doctor, Medication } from "../models/index.js";
 import { checkDrugInteractions } from "../utils/drugInteractionChecker.js";
 
 const VALID_STATUSES = ["Active", "Completed", "Cancelled"];
 
 // GET /api/prescriptions
-const getAllPrescriptions = (req, res) => {
+const getAllPrescriptions = async (req, res) => {
     const { patientId, doctorId, status } = req.query;
 
-    let result = prescriptions;
-    if (patientId) result = result.filter(p => p.patientId === patientId);
-    if (doctorId)  result = result.filter(p => p.doctorId === doctorId);
-    if (status)    result = result.filter(p => p.status.toLowerCase() === status.toLowerCase());
+    try {
+        const where = {};
+        if (patientId) where.patientId = patientId;
+        if (doctorId)  where.doctorId  = doctorId;
+        if (status)    where.status    = status;
 
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const prescriptions = await Prescription.findAll({
+            where,
+            include: [
+                { model: Patient,    attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,     attributes: ["id", "firstName", "lastName"] },
+                { model: Medication, attributes: ["id", "medicationName", "dosage", "category"] }
+            ],
+            order: [["prescriptionDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: prescriptions.length, data: prescriptions });
+    } catch (err) {
+        console.error("getAllPrescriptions error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/prescriptions/:id
-const getPrescriptionById = (req, res) => {
-    const prescription = prescriptions.find(p => p.id === req.params.id);
-    if (!prescription)
-        return res.status(404).json({ success: false, message: "Prescription not found" });
+const getPrescriptionById = async (req, res) => {
+    try {
+        const prescription = await Prescription.findByPk(req.params.id, {
+            include: [
+                { model: Patient,    attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,     attributes: ["id", "firstName", "lastName"] },
+                { model: Medication, attributes: ["id", "medicationName", "dosage", "category"] }
+            ]
+        });
+        if (!prescription)
+            return res.status(404).json({ success: false, message: "Prescription not found" });
 
-    res.status(200).json({ success: true, data: prescription });
+        return res.status(200).json({ success: true, data: prescription });
+    } catch (err) {
+        console.error("getPrescriptionById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/prescriptions/patient/:patientId
-const getPrescriptionsByPatientId = (req, res) => {
-    const patient = patients.find(p => p.id === req.params.patientId);
-    if (!patient)
-        return res.status(404).json({ success: false, message: "Patient not found" });
+const getPrescriptionsByPatientId = async (req, res) => {
+    try {
+        const patient = await Patient.findByPk(req.params.patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-    const result = prescriptions.filter(p => p.patientId === req.params.patientId);
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const prescriptions = await Prescription.findAll({
+            where: { patientId: req.params.patientId },
+            include: [
+                { model: Medication, attributes: ["id", "medicationName", "dosage"] },
+                { model: Doctor,     attributes: ["id", "firstName", "lastName"] }
+            ],
+            order: [["prescriptionDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: prescriptions.length, data: prescriptions });
+    } catch (err) {
+        console.error("getPrescriptionsByPatientId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // POST /api/prescriptions
-const createPrescriptionHandler = (req, res) => {
+const createPrescriptionHandler = async (req, res) => {
     const { patientId, doctorId, medicationId, prescriptionDate, dosage, frequency, duration, refills, notes } = req.body;
 
-    // Required field validation
     const missing = [];
     if (!patientId)        missing.push("patientId");
     if (!doctorId)         missing.push("doctorId");
@@ -52,78 +87,86 @@ const createPrescriptionHandler = (req, res) => {
     if (missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-    // Validate patient exists
-    const patient = patients.find(p => p.id === patientId);
-    if (!patient)
-        return res.status(404).json({ success: false, message: "Patient not found" });
+    try {
+        const patient = await Patient.findByPk(patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-    // Validate doctor exists and is active
-    const doctor = doctors.find(d => d.id === doctorId);
-    if (!doctor)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
-    if (!doctor.isActive)
-        return res.status(400).json({ success: false, message: "Doctor is not active" });
+        const doctor = await Doctor.findByPk(doctorId);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+        if (!doctor.isActive)
+            return res.status(400).json({ success: false, message: "Doctor is not active" });
 
-    // Validate medication exists and is active
-    const medication = medications.find(m => m.id === medicationId);
-    if (!medication)
-        return res.status(404).json({ success: false, message: "Medication not found" });
-    if (!medication.isActive)
-        return res.status(400).json({ success: false, message: "Medication is not active" });
+        const medication = await Medication.findByPk(medicationId);
+        if (!medication)
+            return res.status(404).json({ success: false, message: "Medication not found" });
+        if (!medication.isActive)
+            return res.status(400).json({ success: false, message: "Medication is not active" });
 
-    // Drug interaction check
-    const activePrescriptions = prescriptions.filter(p =>
-        p.patientId === patientId && p.status === "Active"
-    );
-    const activeMedicationIds = activePrescriptions.map(p => p.medicationId);
-    const interactions = checkDrugInteractions(medicationId, activeMedicationIds);
+        // Drug interaction check using active prescriptions
+        const activePrescriptions = await Prescription.findAll({
+            where: { patientId, status: "Active" },
+            attributes: ["medicationId"]
+        });
+        const activeMedicationIds = activePrescriptions.map(p => String(p.medicationId));
+        const interactions = await checkDrugInteractions(medicationId, activeMedicationIds);
 
-    if (interactions.length > 0)
-        return res.status(409).json({
-            success: false,
-            message: "Drug interaction detected",
-            interactions
+        if (interactions.length > 0)
+            return res.status(409).json({
+                success: false,
+                message: "Drug interaction detected",
+                interactions
+            });
+
+        const prescription = await Prescription.create({
+            patientId, doctorId, medicationId, prescriptionDate,
+            dosage, frequency, duration,
+            refills: refills || 0,
+            notes
         });
 
-    const prescription = createPrescription({ patientId, doctorId, medicationId, prescriptionDate, dosage, frequency, duration, refills, notes });
-    prescriptions.push(prescription);
-
-    res.status(201).json({ success: true, data: prescription });
+        return res.status(201).json({ success: true, data: prescription });
+    } catch (err) {
+        console.error("createPrescription error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // PUT /api/prescriptions/:id
-const updatePrescription = (req, res) => {
-    const index = prescriptions.findIndex(p => p.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Prescription not found" });
+const updatePrescription = async (req, res) => {
+    try {
+        const prescription = await Prescription.findByPk(req.params.id);
+        if (!prescription)
+            return res.status(404).json({ success: false, message: "Prescription not found" });
 
-    if (req.body.status && !VALID_STATUSES.includes(req.body.status))
-        return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+        if (req.body.status && !VALID_STATUSES.includes(req.body.status))
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
 
-    prescriptions[index] = {
-        ...prescriptions[index],
-        ...req.body,
-        id:           prescriptions[index].id,
-        patientId:    prescriptions[index].patientId,    // prevent FK override
-        doctorId:     prescriptions[index].doctorId,     // prevent FK override
-        medicationId: prescriptions[index].medicationId, // prevent FK override
-        createdAt:    prescriptions[index].createdAt,
-        updatedAt:    new Date().toISOString()
-    };
+        // Prevent FK overrides
+        const { patientId: _, doctorId: __, medicationId: ___, ...updateData } = req.body;
+        await prescription.update(updateData);
 
-    res.status(200).json({ success: true, data: prescriptions[index] });
+        return res.status(200).json({ success: true, data: prescription });
+    } catch (err) {
+        console.error("updatePrescription error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-// DELETE /api/prescriptions/:id  (soft delete — sets status to Cancelled)
-const deletePrescription = (req, res) => {
-    const index = prescriptions.findIndex(p => p.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Prescription not found" });
+// DELETE /api/prescriptions/:id  (soft cancel)
+const deletePrescription = async (req, res) => {
+    try {
+        const prescription = await Prescription.findByPk(req.params.id);
+        if (!prescription)
+            return res.status(404).json({ success: false, message: "Prescription not found" });
 
-    prescriptions[index].status    = "Cancelled";
-    prescriptions[index].updatedAt = new Date().toISOString();
-
-    res.status(200).json({ success: true, message: "Prescription cancelled successfully" });
+        await prescription.update({ status: "Cancelled" });
+        return res.status(200).json({ success: true, message: "Prescription cancelled successfully" });
+    } catch (err) {
+        console.error("deletePrescription error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export {

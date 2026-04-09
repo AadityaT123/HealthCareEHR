@@ -1,121 +1,132 @@
-import { createMedicalHistory } from "../models/medicalHistory.model.js";
-import { medicalHistories, patients } from "../data/store.data.js";
+import { MedicalHistory, Patient } from "../models/index.js";
 
-const getAllMedicalHistory = (req, res) => {
-  const { patientId } = req.query;
+// GET /api/medical-history
+const getAllMedicalHistory = async (req, res) => {
+    const { patientId } = req.query;
 
-  let result = medicalHistories;
-  if (patientId) result = result.filter((m) => m.patientId === patientId);
+    try {
+        const where = {};
+        if (patientId) where.patientId = patientId;
 
-  res.status(200).json({ success: true, count: result.length, data: result });
+        const records = await MedicalHistory.findAll({
+            where,
+            include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
+            order: [["diagnosisDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: records.length, data: records });
+    } catch (err) {
+        console.error("getAllMedicalHistory error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getMedicalHistoryById = (req, res) => {
-  const record = medicalHistories.find((m) => m.id === req.params.id);
-  if (!record)
-    return res
-      .status(404)
-      .json({ success: false, message: "Medical history not found" });
+// GET /api/medical-history/:id
+const getMedicalHistoryById = async (req, res) => {
+    try {
+        const record = await MedicalHistory.findByPk(req.params.id, {
+            include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }]
+        });
+        if (!record)
+            return res.status(404).json({ success: false, message: "Medical history not found" });
 
-  res.status(200).json({ success: true, data: record });
+        return res.status(200).json({ success: true, data: record });
+    } catch (err) {
+        console.error("getMedicalHistoryById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getMedicalHistoryByPatientId = (req, res) => {
-  const patient = patients.find((p) => p.id === req.params.patientId);
-  if (!patient)
-    return res
-      .status(404)
-      .json({ success: false, message: "Patient not found" });
+// GET /api/medical-history/patient/:patientId
+const getMedicalHistoryByPatientId = async (req, res) => {
+    try {
+        const patient = await Patient.findByPk(req.params.patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-  const records = medicalHistory.filter(
-    (m) => m.patientId === req.params.patientId,
-  );
-  res.status(200).json({ success: true, count: records.length, data: records });
+        const records = await MedicalHistory.findAll({
+            where: { patientId: req.params.patientId },
+            order: [["diagnosisDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: records.length, data: records });
+    } catch (err) {
+        console.error("getMedicalHistoryByPatientId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const createMedicalHistoryHandler = (req, res) => {
-  const { patientId, conditionName, diagnosisDate, notes } = req.body;
+// POST /api/medical-history
+const createMedicalHistoryHandler = async (req, res) => {
+    const { patientId, conditionName, diagnosisDate, notes } = req.body;
 
-  const missing = [];
-  if (!patientId) missing.push("patientId");
-  if (!conditionName) missing.push("conditionName");
-  if (!diagnosisDate) missing.push("diagnosisDate");
+    const missing = [];
+    if (!patientId)     missing.push("patientId");
+    if (!conditionName) missing.push("conditionName");
+    if (!diagnosisDate) missing.push("diagnosisDate");
 
-  if (missing.length > 0)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Missing required fields ${missing.join(", ")}`,
-      });
+    if (missing.length > 0)
+        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-  const patient = patients.find((m) => p.id === patientId);
-  if (!patient)
-    return res
-      .status(404)
-      .json({ success: false, message: "Patient not found" });
+    try {
+        const patient = await Patient.findByPk(patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-  const exists = medicalHistories.find(
-    (m) =>
-      m.patientId === patientId &&
-      m.conditionName.toLowerCase() === conditionName.toLowerCase(),
-  );
-  if (exists)
-    return res
-      .status(409)
-      .json({ success: false, message: "Medical History record not found" });
+        // Prevent duplicate condition for same patient
+        const exists = await MedicalHistory.findOne({
+            where: {
+                patientId,
+                conditionName: conditionName.trim()
+            }
+        });
+        if (exists)
+            return res.status(409).json({ success: false, message: "This condition already exists for this patient" });
 
-  const record = createMedicalHistory({
-    patientId,
-    conditionName,
-    diagnosisDate,
-    notes,
-  });
-  medicalHistory.push(record);
-
-  res.status(201).json({ success: true, data: record });
+        const record = await MedicalHistory.create({ patientId, conditionName, diagnosisDate, notes });
+        return res.status(201).json({ success: true, data: record });
+    } catch (err) {
+        console.error("createMedicalHistory error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const updateMedicalHistory = (req, res) => {
-  const index = medicalHistory.findIndex((m) => m.id === req.params.id);
-  if (index === -1)
-    return res
-      .status(404)
-      .json({ success: false, message: "Medical history not found" });
+// PUT /api/medical-history/:id
+const updateMedicalHistory = async (req, res) => {
+    try {
+        const record = await MedicalHistory.findByPk(req.params.id);
+        if (!record)
+            return res.status(404).json({ success: false, message: "Medical history not found" });
 
-  medicalHistories[index] = {
-    ...medicalHistories[index],
-    ...req.body,
-    id: medicalHistories[index].id,
-    patientId: medicalHistories[index].patientId,
-    createdAt: medicalHistories[index].createdAt,
-    updatedAt: new Date().toISOString(),
-  };
+        // Prevent patientId from being changed
+        const { patientId: _, ...updateData } = req.body;
+        await record.update(updateData);
 
-  res.status(200).json({ success: true, data: medicalHistory[index] });
+        return res.status(200).json({ success: true, data: record });
+    } catch (err) {
+        console.error("updateMedicalHistory error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const deleteMedicalHistory = (req, res) => {
-  const index = medicalHistory.findIndex((m) => m.id === req.params.id);
-  if (index === -1)
-    return res
-      .status(404)
-      .json({ success: false, message: "Medical history record not found" });
+// DELETE /api/medical-history/:id
+const deleteMedicalHistory = async (req, res) => {
+    try {
+        const record = await MedicalHistory.findByPk(req.params.id);
+        if (!record)
+            return res.status(404).json({ success: false, message: "Medical history record not found" });
 
-  medicalHistory.splice(index, 1);
-  res
-    .status(200)
-    .json({
-      success: true,
-      message: "Medical history record deleted successfullt",
-    });
+        await record.destroy();
+        return res.status(200).json({ success: true, message: "Medical history record deleted successfully" });
+    } catch (err) {
+        console.error("deleteMedicalHistory error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export {
-  getAllMedicalHistory,
-  getMedicalHistoryById,
-  getMedicalHistoryByPatientId,
-  createMedicalHistoryHandler,
-  updateMedicalHistory,
-  deleteMedicalHistory,
+    getAllMedicalHistory,
+    getMedicalHistoryById,
+    getMedicalHistoryByPatientId,
+    createMedicalHistoryHandler,
+    updateMedicalHistory,
+    deleteMedicalHistory
 };

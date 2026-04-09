@@ -1,13 +1,32 @@
-const createUser = ({ username, passwordHash, roleId }) => {
-    return {
-        id: Date.now().toString(),
-        username, 
-        passwordHash,
-        roleId,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createUser };
+const User = sequelize.define("User", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    username: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
+    passwordHash: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    roleId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    isActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    }
+}, {
+    tableName: "users",
+    timestamps: true
+});
+
+export default User;

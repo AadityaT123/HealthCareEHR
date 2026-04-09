@@ -1,15 +1,39 @@
-const createAppointment = ({ patientId, doctorId, date, time, type, status, notes }) => {
-    return {
-        id: Date.now().toString(),
-        patientId,
-        doctorId,
-        appointmentDate,
-        appointmentType,
-        status: status || "Scheduled",
-        notes: notes || "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createAppointment };
+const Appointment = sequelize.define("Appointment", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    patientId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    doctorId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    appointmentDate: {
+        type: DataTypes.DATE,
+        allowNull: false
+    },
+    appointmentType: {
+        type: DataTypes.ENUM("Consultation", "Follow-up", "Emergency", "Routine Check-up"),
+        allowNull: false
+    },
+    status: {
+        type: DataTypes.ENUM("Scheduled", "Completed", "Cancelled", "No-Show"),
+        defaultValue: "Scheduled"
+    },
+    notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    }
+}, {
+    tableName: "appointments",
+    timestamps: true
+});
+
+export default Appointment;

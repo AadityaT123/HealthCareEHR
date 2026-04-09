@@ -1,203 +1,187 @@
-import { createAppointment } from "../models/appointment.model.js";
-import { appointments, patients, doctors } from "../data/store.data.js";
+import { Op } from "sequelize";
+import { Appointment, Patient, Doctor } from "../models/index.js";
 
-const VALID_TYPES = [
-  "Consultation",
-  "Follow-up",
-  "Emergency",
-  "Routine Checkup",
-];
+const VALID_TYPES    = ["Consultation", "Follow-up", "Emergency", "Routine Check-up"];
 const VALID_STATUSES = ["Scheduled", "Completed", "Cancelled", "No-Show"];
 
-const getAllAppointments = (req, res) => {
-  const { patientId, doctorId, status, appointmentType } = req.query;
+// GET /api/appointments
+const getAllAppointments = async (req, res) => {
+    const { patientId, doctorId, status, appointmentType } = req.query;
 
-  let result = appointments;
-  if (patientId) result = result.filter((a) => a.patientId === patientId);
-  if (doctorId) result = result.filter((a) => a.doctorId === doctorId);
-  if (status) result = result.filter((a) => a.status.toLowerCase() === status);
-  if (appointmentType)
-    result = result.filter(
-      (a) => a.appointmentType.toLowerCase() === appointmentType.toLowerCase(),
-    );
+    try {
+        const where = {};
+        if (patientId)       where.patientId       = patientId;
+        if (doctorId)        where.doctorId        = doctorId;
+        if (status)          where.status          = status;
+        if (appointmentType) where.appointmentType = appointmentType;
 
-  res.status(200).json({ success: true, count: result.length, data: result });
+        const appointments = await Appointment.findAll({
+            where,
+            include: [
+                { model: Patient, attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,  attributes: ["id", "firstName", "lastName", "specialization"] }
+            ],
+            order: [["appointmentDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+    } catch (err) {
+        console.error("getAllAppointments error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getAppointmentById = (req, res) => {
-  const appointement = appointments.find((a) => a.id === req.params.id);
-  if (!appointement)
-    return res
-      .status(404)
-      .json({ success: false, message: "Appointment not found" });
+// GET /api/appointments/:id
+const getAppointmentById = async (req, res) => {
+    try {
+        const appointment = await Appointment.findByPk(req.params.id, {
+            include: [
+                { model: Patient, attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,  attributes: ["id", "firstName", "lastName", "specialization"] }
+            ]
+        });
+        if (!appointment)
+            return res.status(404).json({ success: false, message: "Appointment not found" });
 
-  res.status(200).json({ success: true, data: appointement });
+        return res.status(200).json({ success: true, data: appointment });
+    } catch (err) {
+        console.error("getAppointmentById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getAppointmentByPatientId = (req, res) => {
-  const patient = patients.find((p) => p.id === req.params.patientId);
-  if (!patient)
-    return res
-      .status(404)
-      .json({ success: false, message: "Patient not found" });
+// GET /api/appointments/patient/:patientId
+const getAppointmentByPatientId = async (req, res) => {
+    try {
+        const patient = await Patient.findByPk(req.params.patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-  const result = appointments.filter(
-    (a) => a.patientId === req.params.patientId,
-  );
-  res.status(200).json({ success: true, count: result.length, data: result });
+        const appointments = await Appointment.findAll({
+            where: { patientId: req.params.patientId },
+            include: [{ model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] }],
+            order: [["appointmentDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+    } catch (err) {
+        console.error("getAppointmentByPatientId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getAppointmentByDoctorId = (req, res) => {
-  const doctor = doctors.find((d) => d.id === req.params.doctorId);
-  if (!doctor)
-    return res
-      .status(404)
-      .json({ success: false, message: "Doctor not found" });
+// GET /api/appointments/doctor/:doctorId
+const getAppointmentByDoctorId = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.doctorId);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-  const result = appointments.filter((a) => a.doctorId === req.params.doctorId);
-  res.status(200).json({ success: true, count: result.length, data: result });
+        const appointments = await Appointment.findAll({
+            where: { doctorId: req.params.doctorId },
+            include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
+            order: [["appointmentDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+    } catch (err) {
+        console.error("getAppointmentByDoctorId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const createAppointmentHandler = (req, res) => {
-  const {
-    patientId,
-    doctorId,
-    appointmentDate,
-    appointmentType,
-    status,
-    notes,
-  } = req.body;
+// POST /api/appointments
+const createAppointmentHandler = async (req, res) => {
+    const { patientId, doctorId, appointmentDate, appointmentType, status, notes } = req.body;
 
-  const missing = [];
-  if (!patientId) missing.push("patientId");
-  if (!doctorId) missing.push("doctorId");
-  if (!appointmentDate) missing.push("appointmentDate");
-  if (!appointmentType) missing.push("appointmentType");
+    const missing = [];
+    if (!patientId)       missing.push("patientId");
+    if (!doctorId)        missing.push("doctorId");
+    if (!appointmentDate)  missing.push("appointmentDate");
+    if (!appointmentType)  missing.push("appointmentType");
 
-  if (missing.length > 0)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Missing required fields: ${missing.join(", ")}`,
-      });
+    if (missing.length > 0)
+        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-  const patient = patients.find((p) => p.id === patientId);
-  if (!patient)
-    return res
-      .status(404)
-      .json({ success: false, message: "Patient not found" });
+    if (!VALID_TYPES.includes(appointmentType))
+        return res.status(400).json({ success: false, message: `Invalid appointmentType. Must be one of: ${VALID_TYPES.join(", ")}` });
 
-  const doctor = doctors.find((d) => d.id === doctorId);
-  if (!doctor)
-    return res
-      .status(404)
-      .json({ success: false, message: "Doctor not found" });
+    if (status && !VALID_STATUSES.includes(status))
+        return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
 
-  if (!doctor.isActive)
-    return res
-      .status(400)
-      .json({ success: false, message: "Doctor is not active" });
+    try {
+        const patient = await Patient.findByPk(patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-  if (!VALID_TYPES.includes(appointmentType))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Invalid appointment type. Must be one of: ${VALID_TYPES.join(", ")}`,
-      });
+        const doctor = await Doctor.findByPk(doctorId);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-  if (!VALID_STATUSES.includes(status))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
-      });
+        if (!doctor.isActive)
+            return res.status(400).json({ success: false, message: "Doctor is not active" });
 
-  if (status && !VALID_STATUSES.includes(status))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`,
-      });
+        // Check for scheduling conflicts
+        const conflict = await Appointment.findOne({
+            where: {
+                doctorId,
+                appointmentDate,
+                status: "Scheduled"
+            }
+        });
+        if (conflict)
+            return res.status(409).json({ success: false, message: "Doctor has another scheduled appointment at the same time" });
 
-  const conflict = appointments.find(
-    (a) =>
-      a.doctorId === doctorId &&
-      a.appointmentDate === appointmentDate &&
-      a.status === "Scheduled",
-  );
-  if (conflict)
-    return res
-      .status(409)
-      .json({
-        success: false,
-        message: "Doctor has another scheduled appointment at the same time",
-      });
+        const appointment = await Appointment.create({
+            patientId, doctorId, appointmentDate,
+            appointmentType,
+            status: status || "Scheduled",
+            notes
+        });
 
-  const appointment = createAppointment({
-    patientId,
-    doctorId,
-    appointmentDate,
-    appointmentType,
-    status,
-    notes,
-  });
-  appointments.push(appointment);
-
-  res.status(201).json({ success: true, data: appointment });
+        return res.status(201).json({ success: true, data: appointment });
+    } catch (err) {
+        console.error("createAppointment error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const updateAppointment = (req, res) => {
-  const index = appointments.findIndex((a) => a.id === req.params.id);
-  if (index === -1)
-    return res
-      .status(404)
-      .json({ success: false, message: "Appointment not found" });
+// PUT /api/appointments/:id
+const updateAppointment = async (req, res) => {
+    try {
+        const appointment = await Appointment.findByPk(req.params.id);
+        if (!appointment)
+            return res.status(404).json({ success: false, message: "Appointment not found" });
 
-  const validStatuses = ["Scheduled", "Completed", "Cancelled"];
-  if (req.body.status && !validStatuses.included(req.body.status))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-      });
+        if (req.body.status && !VALID_STATUSES.includes(req.body.status))
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
 
-  appointments[index] = {
-    ...appointments[index],
-    ...req.body,
-    id: appointments[index].id,
-    createdAt: appointments[index].createdAt,
-    updatedAt: new Date().toString(),
-  };
-
-  res.status(200).json({ success: true, data: appointments[index] });
+        await appointment.update(req.body);
+        return res.status(200).json({ success: true, data: appointment });
+    } catch (err) {
+        console.error("updateAppointment error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const deleteAppointment = (req, res) => {
-  const index = appointments.findIndex((a) => a.id === req.params.id);
-  if (index === -1)
-    return res
-      .status(404)
-      .json({ success: false, message: "Appointment not found" });
+// DELETE /api/appointments/:id  (soft cancel)
+const deleteAppointment = async (req, res) => {
+    try {
+        const appointment = await Appointment.findByPk(req.params.id);
+        if (!appointment)
+            return res.status(404).json({ success: false, message: "Appointment not found" });
 
-  appointments[index].status = "Cancelled";
-  appointments[index].updatedAt = new Date().toISOString();
-
-  res
-    .status(200)
-    .json({ success: true, message: "Appointment cancelled successfully" });
+        await appointment.update({ status: "Cancelled" });
+        return res.status(200).json({ success: true, message: "Appointment cancelled successfully" });
+    } catch (err) {
+        console.error("deleteAppointment error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export {
-  getAllAppointments,
-  getAppointmentById,
-  getAppointmentByPatientId,
-  getAppointmentByDoctorId,
-  createAppointmentHandler,
-  updateAppointment,
-  deleteAppointment,
+    getAllAppointments,
+    getAppointmentById,
+    getAppointmentByPatientId,
+    getAppointmentByDoctorId,
+    createAppointmentHandler,
+    updateAppointment,
+    deleteAppointment
 };

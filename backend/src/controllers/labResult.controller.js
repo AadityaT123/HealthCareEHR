@@ -1,50 +1,79 @@
-import { createLabResult } from "../models/labResult.model.js";
-import { labResults, labOrders } from "../data/store.data.js";
+import { LabResult, LabOrder, Patient } from "../models/index.js";
 import { sendCriticalResultAlert } from "../utils/notificationService.js";
 
 const VALID_STATUSES = ["Normal", "Abnormal", "Critical"];
 
 // GET /api/lab-results
-const getAllLabResults = (req, res) => {
+const getAllLabResults = async (req, res) => {
     const { labOrderId, status } = req.query;
 
-    let result = labResults;
-    if (labOrderId) result = result.filter(r => r.labOrderId === labOrderId);
-    if (status)     result = result.filter(r => r.status.toLowerCase() === status.toLowerCase());
+    try {
+        const where = {};
+        if (labOrderId) where.labOrderId = labOrderId;
+        if (status)     where.status     = status;
 
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const results = await LabResult.findAll({
+            where,
+            include: [{ model: LabOrder, attributes: ["id", "testType", "orderDate", "patientId", "doctorId"] }],
+            order: [["resultDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: results.length, data: results });
+    } catch (err) {
+        console.error("getAllLabResults error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/lab-results/:id
-const getLabResultById = (req, res) => {
-    const result = labResults.find(r => r.id === req.params.id);
-    if (!result)
-        return res.status(404).json({ success: false, message: "Lab result not found" });
+const getLabResultById = async (req, res) => {
+    try {
+        const result = await LabResult.findByPk(req.params.id, {
+            include: [{ model: LabOrder, attributes: ["id", "testType", "orderDate"] }]
+        });
+        if (!result)
+            return res.status(404).json({ success: false, message: "Lab result not found" });
 
-    res.status(200).json({ success: true, data: result });
+        return res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        console.error("getLabResultById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/lab-results/order/:labOrderId
-const getLabResultsByOrderId = (req, res) => {
-    const labOrder = labOrders.find(l => l.id === req.params.labOrderId);
-    if (!labOrder)
-        return res.status(404).json({ success: false, message: "Lab order not found" });
+const getLabResultsByOrderId = async (req, res) => {
+    try {
+        const labOrder = await LabOrder.findByPk(req.params.labOrderId);
+        if (!labOrder)
+            return res.status(404).json({ success: false, message: "Lab order not found" });
 
-    const results = labResults.filter(r => r.labOrderId === req.params.labOrderId);
-    res.status(200).json({ success: true, count: results.length, data: results });
+        const results = await LabResult.findAll({ where: { labOrderId: req.params.labOrderId } });
+        return res.status(200).json({ success: true, count: results.length, data: results });
+    } catch (err) {
+        console.error("getLabResultsByOrderId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/lab-results/critical
-const getCriticalLabResults = (req, res) => {
-    const results = labResults.filter(r => r.isCritical === true);
-    res.status(200).json({ success: true, count: results.length, data: results });
+const getCriticalLabResults = async (req, res) => {
+    try {
+        const results = await LabResult.findAll({
+            where: { isCritical: true },
+            include: [{ model: LabOrder, attributes: ["id", "testType", "patientId", "doctorId"] }],
+            order: [["resultDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: results.length, data: results });
+    } catch (err) {
+        console.error("getCriticalLabResults error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // POST /api/lab-results
-const createLabResultHandler = (req, res) => {
+const createLabResultHandler = async (req, res) => {
     const { labOrderId, resultValue, resultDate, unit, referenceRange, status, notes } = req.body;
 
-    // Required field validation
     const missing = [];
     if (!labOrderId)   missing.push("labOrderId");
     if (!resultValue)  missing.push("resultValue");
@@ -53,85 +82,86 @@ const createLabResultHandler = (req, res) => {
     if (missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-    // Validate lab order exists
-    const labOrder = labOrders.find(l => l.id === labOrderId);
-    if (!labOrder)
-        return res.status(404).json({ success: false, message: "Lab order not found" });
-
-    // Prevent result if lab order is cancelled
-    if (labOrder.status === "Cancelled")
-        return res.status(400).json({ success: false, message: "Cannot add result to a cancelled lab order" });
-
-    // Validate status
     if (status && !VALID_STATUSES.includes(status))
         return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
 
-    // Prevent duplicate result for same lab order
-    const exists = labResults.find(r => r.labOrderId === labOrderId);
-    if (exists)
-        return res.status(409).json({ success: false, message: "A result already exists for this lab order" });
+    try {
+        const labOrder = await LabOrder.findByPk(labOrderId);
+        if (!labOrder)
+            return res.status(404).json({ success: false, message: "Lab order not found" });
 
-    const labResult = createLabResult({ labOrderId, resultValue, resultDate, unit, referenceRange, status, notes });
-    labResults.push(labResult);
+        if (labOrder.status === "Cancelled")
+            return res.status(400).json({ success: false, message: "Cannot add result to a cancelled lab order" });
 
-    // Auto update lab order status to Completed
-    const labOrderIndex = labOrders.findIndex(l => l.id === labOrderId);
-    if (labOrderIndex !== -1) {
-        labOrders[labOrderIndex].status    = "Completed";
-        labOrders[labOrderIndex].updatedAt = new Date().toISOString();
+        // Prevent duplicate result for same lab order
+        const exists = await LabResult.findOne({ where: { labOrderId } });
+        if (exists)
+            return res.status(409).json({ success: false, message: "A result already exists for this lab order" });
+
+        const isCritical = status === "Critical";
+
+        const labResult = await LabResult.create({
+            labOrderId, resultValue, resultDate, unit,
+            referenceRange, notes,
+            status: status || "Normal",
+            isCritical
+        });
+
+        // Auto-update lab order status to Completed
+        await labOrder.update({ status: "Completed" });
+
+        // Trigger critical result alert
+        if (isCritical) sendCriticalResultAlert(labResult, labOrder);
+
+        return res.status(201).json({
+            success: true,
+            data: labResult,
+            ...(isCritical && { alert: "⚠️ Critical result — relevant staff have been notified" })
+        });
+    } catch (err) {
+        console.error("createLabResult error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-
-    // Trigger critical result alert
-    if (labResult.isCritical)
-        sendCriticalResultAlert(labResult, labOrder);
-
-    res.status(201).json({
-        success: true,
-        data: labResult,
-        ...(labResult.isCritical && { alert: "⚠️ Critical result — relevant staff have been notified" })
-    });
 };
 
 // PUT /api/lab-results/:id
-const updateLabResult = (req, res) => {
-    const index = labResults.findIndex(r => r.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Lab result not found" });
+const updateLabResult = async (req, res) => {
+    try {
+        const result = await LabResult.findByPk(req.params.id);
+        if (!result)
+            return res.status(404).json({ success: false, message: "Lab result not found" });
 
-    if (req.body.status && !VALID_STATUSES.includes(req.body.status))
-        return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+        if (req.body.status && !VALID_STATUSES.includes(req.body.status))
+            return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
 
-    // Recalculate isCritical if status changes
-    const updatedStatus = req.body.status || labResults[index].status;
+        const updatedStatus = req.body.status || result.status;
+        const { labOrderId: _, ...updateData } = req.body;
 
-    labResults[index] = {
-        ...labResults[index],
-        ...req.body,
-        id:         labResults[index].id,
-        labOrderId: labResults[index].labOrderId,   // prevent FK override
-        isCritical: updatedStatus === "Critical",
-        createdAt:  labResults[index].createdAt,
-        updatedAt:  new Date().toISOString()
-    };
-
-    res.status(200).json({ success: true, data: labResults[index] });
+        await result.update({ ...updateData, isCritical: updatedStatus === "Critical" });
+        return res.status(200).json({ success: true, data: result });
+    } catch (err) {
+        console.error("updateLabResult error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // DELETE /api/lab-results/:id
-const deleteLabResult = (req, res) => {
-    const index = labResults.findIndex(r => r.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Lab result not found" });
+const deleteLabResult = async (req, res) => {
+    try {
+        const result = await LabResult.findByPk(req.params.id);
+        if (!result)
+            return res.status(404).json({ success: false, message: "Lab result not found" });
 
-    // Revert lab order status back to In Progress
-    const labOrderIndex = labOrders.findIndex(l => l.id === labResults[index].labOrderId);
-    if (labOrderIndex !== -1) {
-        labOrders[labOrderIndex].status    = "In Progress";
-        labOrders[labOrderIndex].updatedAt = new Date().toISOString();
+        // Revert lab order status to In Progress
+        const labOrder = await LabOrder.findByPk(result.labOrderId);
+        if (labOrder) await labOrder.update({ status: "In Progress" });
+
+        await result.destroy();
+        return res.status(200).json({ success: true, message: "Lab result deleted successfully" });
+    } catch (err) {
+        console.error("deleteLabResult error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-
-    labResults.splice(index, 1);
-    res.status(200).json({ success: true, message: "Lab result deleted successfully" });
 };
 
 export {

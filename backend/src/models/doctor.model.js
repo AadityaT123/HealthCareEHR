@@ -1,15 +1,45 @@
-const createDoctor = ({ firstName, lastName, specialization, email, phone, licenseNumber  }) => {
-    return {
-        id: Date.now().toString(),
-        firstName,
-        lastName,
-        specialization,
-        email,
-        phone,
-        licenseNumber,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createDoctor };
+const Doctor = sequelize.define("Doctor", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    firstName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    lastName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    specialization: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    email: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
+    phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    licenseNumber: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true
+    },
+    isActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    }
+}, {
+    tableName: "doctors",
+    timestamps: true
+});
+
+export default Doctor;

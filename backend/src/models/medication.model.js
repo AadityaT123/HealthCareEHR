@@ -1,16 +1,43 @@
-const createMedication = ({ medicationName, dosage, instructions, category, sideEffects, contraindications }) => {
-    return {
-        id: Date.now().toString(),
-        medicationName,
-        dosage,
-        instructions,
-        category,
-        sideEffects: sideEffects || [],
-        contraindications: contraindications || [],
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createMedication };
+const Medication = sequelize.define("Medication", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    medicationName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    dosage: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    instructions: {
+        type: DataTypes.TEXT,
+        allowNull: false
+    },
+    category: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    sideEffects: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        defaultValue: []
+    },
+    contraindications: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        defaultValue: []
+    },
+    isActive: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    }
+}, {
+    tableName: "medications",
+    timestamps: true
+});
+
+export default Medication;

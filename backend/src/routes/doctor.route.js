@@ -8,7 +8,7 @@ router.get("/", protect, getAllDoctors);
 router.get("/:id", protect, getDoctorById);
 router.post("/", protect, authorize("Admin"), createDoctorHandler);
 router.put("/:id", protect, authorize("Admin"), updateDoctor);
-router.put("/:id/deactivate", protect, authorize("Admin"), deactivateDoctor);
+router.patch("/:id/deactivate", protect, authorize("Admin"), deactivateDoctor);
 router.delete("/:id", protect, authorize("Admin"), deleteDoctor);
 
 export default router;

@@ -1,13 +1,31 @@
-const createMedicalHistory = ({ patientId, conditionName, diagnosisDate, notes }) => {
-    return {
-        id: Date.now().toString(),
-        patientId,
-        conditionName,
-        diagnosisDate,
-        notes: notes || "",
-        createdAt:new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createMedicalHistory };
+const MedicalHistory = sequelize.define("MedicalHistory", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    patientId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
+    },
+    conditionName: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    diagnosisDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: false
+    },
+    notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    }
+}, {
+    tableName: "medical_histories",
+    timestamps: true
+});
+
+export default MedicalHistory;

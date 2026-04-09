@@ -1,95 +1,122 @@
-import { createDoctor } from "../models/doctor.model.js";
-import { doctors } from "../data/store.data.js";
+import { Op } from "sequelize";
+import { Doctor } from "../models/index.js";
 
-const getAllDoctors = (req, res) => {
+// GET /api/doctors
+const getAllDoctors = async (req, res) => {
     const { specialization } = req.query;
 
-    let result = doctors;
-    if(specialization) 
-        result = result.filter(d => d.specialization.toLowerCase() === specialization.toLowerCase());
+    try {
+        const where = {};
+        if (specialization) where.specialization = { [Op.iLike]: specialization };
 
-    res.status(200).json({ success: true, count: result.length, data: result });
-
+        const doctors = await Doctor.findAll({ where });
+        return res.status(200).json({ success: true, count: doctors.length, data: doctors });
+    } catch (err) {
+        console.error("getAllDoctors error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getDoctorById = (req, res) => {
-    const doctor = doctors.find(d => d.id === req.params.id );
-    if(!doctor)  
-        return res.status(404).json({ success: false, message: "Doctor not found" });
+// GET /api/doctors/:id
+const getDoctorById = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.id);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-    res.status(200).json({ success: true, data: doctor });
+        return res.status(200).json({ success: true, data: doctor });
+    } catch (err) {
+        console.error("getDoctorById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const createDoctorHandler = (req, res) => {
+// POST /api/doctors
+const createDoctorHandler = async (req, res) => {
     const { firstName, lastName, specialization, email, phone, licenseNumber } = req.body;
 
     const missing = [];
+    if (!firstName)      missing.push("firstName");
+    if (!lastName)       missing.push("lastName");
+    if (!specialization) missing.push("specialization");
+    if (!email)          missing.push("email");
+    if (!phone)          missing.push("phone");
+    if (!licenseNumber)  missing.push("licenseNumber");
 
-    if(!firstName) missing.push("firstName");
-    if(!lastName) missing.push("lastName");
-    if(!specialization) missing.push("specialization");
-    if(!email) missing.push("email");
-    if(!phone) missing.push("phone");
-    if(!licenseNumber) missing.push("licenseNumber");
+    if (missing.length > 0)
+        return res.status(400).json({ success: false, message: `Missing fields: ${missing.join(", ")}` });
 
-    if(missing.length > 0) 
-        return res.status(400).json({ success: false, message: `Missing fields  : ${missing.join(", ")}` });
+    try {
+        const licenseDup = await Doctor.findOne({ where: { licenseNumber } });
+        if (licenseDup)
+            return res.status(409).json({ success: false, message: "A doctor with this license number already exists" });
 
-    const existing = doctors.find(d => d.licenseNumber === licenseNumber );
-    if(existing)
-        return res.status(409).json({ success: false, message: "A doctor with this license number already exists" });
+        const emailDup = await Doctor.findOne({ where: { email: { [Op.iLike]: email } } });
+        if (emailDup)
+            return res.status(409).json({ success: false, message: "A doctor with this email already exists" });
 
-    const emailExists = doctors.find(d => d.email.toLowerCase() === email.toLowerCase());
-    if(emailExists)
-        return res.status(409).json({ success: false, message: "A docotor with same email address is already exists" });
-
-    const doctor = createDoctor({ firstName, lastName, specialization, email, phone, licenseNumber });
-    doctors.push(doctor);
-
-    res.status(201).json({ success: true, data: doctor });
-};
-
-const updateDoctor = (req, res) => {
-    const index = doctors.findIndex(d => d.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
-
-    if(req.body.licenseNumber){
-        const duplicate = doctors.find(d => d.licenseNumber === req.body.licenseNumber && d.id !== req.params.id);
-        if(duplicate)
-            return res.status(409).json({ success: false, message: "License number already exists" });
-
+        const doctor = await Doctor.create({ firstName, lastName, specialization, email, phone, licenseNumber });
+        return res.status(201).json({ success: true, data: doctor });
+    } catch (err) {
+        console.error("createDoctor error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-
-    doctors[index] = {
-        ...doctors[index],
-        ...req.body,
-        id: doctors[index].id,
-        createdAt: doctors[index].createdAt,
-        updatedAt: new Date().toISOString()
-    };
-
-    res.status(200).json({ success: true, data: doctors[index] });
 };
 
-const deleteDoctor = (req, res) => {
-    const index = doctors.findIndex(d => d.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
-    
-    doctors.splice(index, 1);
-    res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+// PUT /api/doctors/:id
+const updateDoctor = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.id);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+
+        if (req.body.licenseNumber) {
+            const dup = await Doctor.findOne({
+                where: {
+                    licenseNumber: req.body.licenseNumber,
+                    id: { [Op.ne]: req.params.id }
+                }
+            });
+            if (dup)
+                return res.status(409).json({ success: false, message: "License number already exists" });
+        }
+
+        await doctor.update(req.body);
+        return res.status(200).json({ success: true, data: doctor });
+    } catch (err) {
+        console.error("updateDoctor error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const deactivateDoctor = (req, res) => {
-    const index = doctors.findIndex(d => d.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
+// DELETE /api/doctors/:id
+const deleteDoctor = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.id);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-    doctors[index].isActive = false;
-    doctors[index].updatedAt = new Date().toISOString();
+        await doctor.destroy();
+        return res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+    } catch (err) {
+        console.error("deleteDoctor error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+};
 
-    res.status(200).json({ success: true, message: "Doctor deactivated successfully" });
+// PATCH /api/doctors/:id/deactivate
+const deactivateDoctor = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.id);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
+
+        await doctor.update({ isActive: false });
+        return res.status(200).json({ success: true, message: "Doctor deactivated successfully" });
+    } catch (err) {
+        console.error("deactivateDoctor error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export { getAllDoctors, getDoctorById, createDoctorHandler, updateDoctor, deleteDoctor, deactivateDoctor };

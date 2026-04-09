@@ -1,25 +1,48 @@
-const createLabResult = ({ 
-    labOrderId, 
-    resultValue, 
-    resultDate, 
-    unit,
-    referenceRange,
-    status,
-    notes 
-}) => {
-    return {
-        id: Date.now().toString(),
-        labOrderId,                     // FK → labOrders
-        resultValue,                    // e.g. "120 mg/dL", "Negative", "Normal"
-        resultDate,                     // e.g. "2026-04-01"
-        unit: unit || "",               // e.g. "mg/dL", "mmol/L"
-        referenceRange: referenceRange || "", // e.g. "70-100 mg/dL"
-        status: status || "Normal",     // "Normal", "Abnormal", "Critical"
-        notes: notes || "",
-        isCritical: status === "Critical",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-};
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
-export { createLabResult };
+const LabResult = sequelize.define("LabResult", {
+    id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    labOrderId: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        unique: true
+    },
+    resultValue: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    resultDate: {
+        type: DataTypes.DATEONLY,
+        allowNull: false
+    },
+    unit: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    referenceRange: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    status: {
+        type: DataTypes.ENUM("Normal", "Abnormal", "Critical"),
+        defaultValue: "Normal"
+    },
+    isCritical: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    }
+}, {
+    tableName: "lab_results",
+    timestamps: true
+});
+
+export default LabResult;

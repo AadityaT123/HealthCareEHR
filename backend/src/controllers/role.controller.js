@@ -1,68 +1,79 @@
-import { createRole } from '../models/role.model.js';
-import { roles } from '../data/store.data.js';
+import { Op } from "sequelize";
+import { Role } from "../models/index.js";
 
-// let roles = [
-//     { id: "1", roleName: "Admin", description: "Full System Access" },
-//     { id: "2", roleName: "Doctor", description: "Clinical documentation and orders" },
-//     { id: "3", roleName: "Nurse", description: "Medication administration and notes" },
-//     { id: "4", roleName: "Pharmacist", description: "Medication Management" },
-//     { id: "5", roleName: "Lab Technician", description: "Lab orders and results" },
-//     { id: "6", roleName: "Receptionist", description: "Patient registration and appointments" }
-// ];
-
-const getAllRoles = (req, res) => {
-    res.status(200).json({ success: true, count: roles.length, data: roles });
+// GET /api/roles
+const getAllRoles = async (req, res) => {
+    try {
+        const roles = await Role.findAll({ order: [["id", "ASC"]] });
+        return res.status(200).json({ success: true, count: roles.length, data: roles });
+    } catch (err) {
+        console.error("getAllRoles error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getRoleById = (req, res) => {
-    const role = roles.find(r => r.id === req.params.id);
-    if(!role)
-        return res.status(404).json({ success: false, message: "Role not found" });
+// GET /api/roles/:id
+const getRoleById = async (req, res) => {
+    try {
+        const role = await Role.findByPk(req.params.id);
+        if (!role)
+            return res.status(404).json({ success: false, message: "Role not found" });
 
-
-    res.status(200).json({ success: true, data: role });
+        return res.status(200).json({ success: true, data: role });
+    } catch (err) {
+        console.error("getRoleById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const createRoleHandler = (req, res) => {
+// POST /api/roles
+const createRoleHandler = async (req, res) => {
     const { roleName, description } = req.body;
 
-    if(!roleName) 
+    if (!roleName)
         return res.status(400).json({ success: false, message: "roleName is required" });
 
-    const exists = roles.find(r => r.roleName.toLowerCase() === roleName.toLowerCase());
-    if(exists)
-        return res.status(409).json({ success: false, message: "Role already exists" });
+    try {
+        const exists = await Role.findOne({ where: { roleName: { [Op.iLike]: roleName } } });
+        if (exists)
+            return res.status(409).json({ success: false, message: "Role already exists" });
 
-    const role = createRole({ roleName, description });
-    roles.push(role);
-
-    res.status(201).json({ success: true, data: role });
+        const role = await Role.create({ roleName, description });
+        return res.status(201).json({ success: true, data: role });
+    } catch (err) {
+        console.error("createRole error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const updateRole = (req, res) => {
-    const index = roles.findIndex(r => r.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: " Role not founf" });
+// PUT /api/roles/:id
+const updateRole = async (req, res) => {
+    try {
+        const role = await Role.findByPk(req.params.id);
+        if (!role)
+            return res.status(404).json({ success: false, message: "Role not found" });
 
-    roles[index] = {
-        ...roles[index],
-        ...req.body,
-        id: roles[index].id,
-        createdAt: roles[index].createdAt,
-        updatedAt: new Date().toISOString()
-    };
-
-    res.status(200).json({ success: true, data: roles[index] });
+        await role.update(req.body);
+        return res.status(200).json({ success: true, data: role });
+    } catch (err) {
+        console.error("updateRole error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const deleteRole = (req, res) => {
-    const index = roles.findIndex(r => r.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: " Role not founf" });
+// DELETE /api/roles/:id
+const deleteRole = async (req, res) => {
+    try {
+        const role = await Role.findByPk(req.params.id);
+        if (!role)
+            return res.status(404).json({ success: false, message: "Role not found" });
 
-    roles.splice(index, 1);
-
-    res.status(200).json({ success: true, message: "Role deleted Successfully" });
+        await role.destroy();
+        return res.status(200).json({ success: true, message: "Role deleted successfully" });
+    } catch (err) {
+        console.error("deleteRole error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export { getAllRoles, getRoleById, createRoleHandler, updateRole, deleteRole };

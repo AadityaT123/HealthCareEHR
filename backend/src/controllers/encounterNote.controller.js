@@ -1,52 +1,93 @@
-import { createEncounterNote } from "../models/encounterNote.model.js";
-import { encounterNotes, patients, doctors, appointments } from "../data/store.data.js";
+import { EncounterNote, Patient, Doctor, Appointment } from "../models/index.js";
 
 // GET /api/encounters
-const getAllEncounterNotes = (req, res) => {
+const getAllEncounterNotes = async (req, res) => {
     const { patientId, doctorId, appointmentId } = req.query;
 
-    let result = encounterNotes;
-    if (patientId)     result = result.filter(e => e.patientId === patientId);
-    if (doctorId)      result = result.filter(e => e.doctorId === doctorId);
-    if (appointmentId) result = result.filter(e => e.appointmentId === appointmentId);
+    try {
+        const where = {};
+        if (patientId)     where.patientId     = patientId;
+        if (doctorId)      where.doctorId      = doctorId;
+        if (appointmentId) where.appointmentId = appointmentId;
 
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const notes = await EncounterNote.findAll({
+            where,
+            include: [
+                { model: Patient,     attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,      attributes: ["id", "firstName", "lastName", "specialization"] },
+                { model: Appointment, attributes: ["id", "appointmentDate", "appointmentType"] }
+            ],
+            order: [["encounterDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: notes.length, data: notes });
+    } catch (err) {
+        console.error("getAllEncounterNotes error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/encounters/:id
-const getEncounterNoteById = (req, res) => {
-    const note = encounterNotes.find(e => e.id === req.params.id);
-    if (!note)
-        return res.status(404).json({ success: false, message: "Encounter note not found" });
+const getEncounterNoteById = async (req, res) => {
+    try {
+        const note = await EncounterNote.findByPk(req.params.id, {
+            include: [
+                { model: Patient,     attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor,      attributes: ["id", "firstName", "lastName", "specialization"] },
+                { model: Appointment, attributes: ["id", "appointmentDate", "appointmentType"] }
+            ]
+        });
+        if (!note)
+            return res.status(404).json({ success: false, message: "Encounter note not found" });
 
-    res.status(200).json({ success: true, data: note });
+        return res.status(200).json({ success: true, data: note });
+    } catch (err) {
+        console.error("getEncounterNoteById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/encounters/patient/:patientId
-const getEncounterNotesByPatientId = (req, res) => {
-    const patient = patients.find(p => p.id === req.params.patientId);
-    if (!patient)
-        return res.status(404).json({ success: false, message: "Patient not found" });
+const getEncounterNotesByPatientId = async (req, res) => {
+    try {
+        const patient = await Patient.findByPk(req.params.patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-    const result = encounterNotes.filter(e => e.patientId === req.params.patientId);
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const notes = await EncounterNote.findAll({
+            where: { patientId: req.params.patientId },
+            include: [{ model: Doctor, attributes: ["id", "firstName", "lastName"] }],
+            order: [["encounterDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: notes.length, data: notes });
+    } catch (err) {
+        console.error("getEncounterNotesByPatientId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // GET /api/encounters/doctor/:doctorId
-const getEncounterNotesByDoctorId = (req, res) => {
-    const doctor = doctors.find(d => d.id === req.params.doctorId);
-    if (!doctor)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
+const getEncounterNotesByDoctorId = async (req, res) => {
+    try {
+        const doctor = await Doctor.findByPk(req.params.doctorId);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-    const result = encounterNotes.filter(e => e.doctorId === req.params.doctorId);
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const notes = await EncounterNote.findAll({
+            where: { doctorId: req.params.doctorId },
+            include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
+            order: [["encounterDate", "DESC"]]
+        });
+        return res.status(200).json({ success: true, count: notes.length, data: notes });
+    } catch (err) {
+        console.error("getEncounterNotesByDoctorId error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // POST /api/encounters
-const createEncounterNoteHandler = (req, res) => {
+const createEncounterNoteHandler = async (req, res) => {
     const { patientId, doctorId, appointmentId, encounterDate, chiefComplaint, diagnosis, treatmentPlan, notes } = req.body;
 
-    // Required field validation
     const missing = [];
     if (!patientId)      missing.push("patientId");
     if (!doctorId)       missing.push("doctorId");
@@ -59,73 +100,76 @@ const createEncounterNoteHandler = (req, res) => {
     if (missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
-    // Validate patient exists
-    const patient = patients.find(p => p.id === patientId);
-    if (!patient)
-        return res.status(404).json({ success: false, message: "Patient not found" });
+    try {
+        const patient = await Patient.findByPk(patientId);
+        if (!patient)
+            return res.status(404).json({ success: false, message: "Patient not found" });
 
-    // Validate doctor exists
-    const doctor = doctors.find(d => d.id === doctorId);
-    if (!doctor)
-        return res.status(404).json({ success: false, message: "Doctor not found" });
+        const doctor = await Doctor.findByPk(doctorId);
+        if (!doctor)
+            return res.status(404).json({ success: false, message: "Doctor not found" });
 
-    // Validate appointment exists
-    const appointment = appointments.find(a => a.id === appointmentId);
-    if (!appointment)
-        return res.status(404).json({ success: false, message: "Appointment not found" });
+        const appointment = await Appointment.findByPk(appointmentId);
+        if (!appointment)
+            return res.status(404).json({ success: false, message: "Appointment not found" });
 
-    // Validate appointment belongs to same patient and doctor
-    if (appointment.patientId !== patientId)
-        return res.status(400).json({ success: false, message: "Appointment does not belong to this patient" });
-    if (appointment.doctorId !== doctorId)
-        return res.status(400).json({ success: false, message: "Appointment does not belong to this doctor" });
+        if (appointment.patientId !== parseInt(patientId))
+            return res.status(400).json({ success: false, message: "Appointment does not belong to this patient" });
 
-    // Prevent duplicate encounter note for same appointment
-    const exists = encounterNotes.find(e => e.appointmentId === appointmentId);
-    if (exists)
-        return res.status(409).json({ success: false, message: "An encounter note already exists for this appointment" });
+        if (appointment.doctorId !== parseInt(doctorId))
+            return res.status(400).json({ success: false, message: "Appointment does not belong to this doctor" });
 
-    const note = createEncounterNote({ patientId, doctorId, appointmentId, encounterDate, chiefComplaint, diagnosis, treatmentPlan, notes });
-    encounterNotes.push(note);
+        // Prevent duplicate encounter note per appointment (unique constraint in DB)
+        const exists = await EncounterNote.findOne({ where: { appointmentId } });
+        if (exists)
+            return res.status(409).json({ success: false, message: "An encounter note already exists for this appointment" });
 
-    // Update appointment status to Completed
-    const appointmentIndex = appointments.findIndex(a => a.id === appointmentId);
-    if (appointmentIndex !== -1) {
-        appointments[appointmentIndex].status    = "Completed";
-        appointments[appointmentIndex].updatedAt = new Date().toISOString();
+        const note = await EncounterNote.create({
+            patientId, doctorId, appointmentId, encounterDate,
+            chiefComplaint, diagnosis, treatmentPlan, notes
+        });
+
+        // Auto-complete appointment
+        await appointment.update({ status: "Completed" });
+
+        return res.status(201).json({ success: true, data: note });
+    } catch (err) {
+        console.error("createEncounterNote error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-
-    res.status(201).json({ success: true, data: note });
 };
 
 // PUT /api/encounters/:id
-const updateEncounterNote = (req, res) => {
-    const index = encounterNotes.findIndex(e => e.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Encounter note not found" });
+const updateEncounterNote = async (req, res) => {
+    try {
+        const note = await EncounterNote.findByPk(req.params.id);
+        if (!note)
+            return res.status(404).json({ success: false, message: "Encounter note not found" });
 
-    encounterNotes[index] = {
-        ...encounterNotes[index],
-        ...req.body,
-        id:            encounterNotes[index].id,
-        patientId:     encounterNotes[index].patientId,     // prevent FK override
-        doctorId:      encounterNotes[index].doctorId,      // prevent FK override
-        appointmentId: encounterNotes[index].appointmentId, // prevent FK override
-        createdAt:     encounterNotes[index].createdAt,
-        updatedAt:     new Date().toISOString()
-    };
+        // Prevent FK overrides
+        const { patientId: _, doctorId: __, appointmentId: ___, ...updateData } = req.body;
+        await note.update(updateData);
 
-    res.status(200).json({ success: true, data: encounterNotes[index] });
+        return res.status(200).json({ success: true, data: note });
+    } catch (err) {
+        console.error("updateEncounterNote error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 // DELETE /api/encounters/:id
-const deleteEncounterNote = (req, res) => {
-    const index = encounterNotes.findIndex(e => e.id === req.params.id);
-    if (index === -1)
-        return res.status(404).json({ success: false, message: "Encounter note not found" });
+const deleteEncounterNote = async (req, res) => {
+    try {
+        const note = await EncounterNote.findByPk(req.params.id);
+        if (!note)
+            return res.status(404).json({ success: false, message: "Encounter note not found" });
 
-    encounterNotes.splice(index, 1);
-    res.status(200).json({ success: true, message: "Encounter note deleted successfully" });
+        await note.destroy();
+        return res.status(200).json({ success: true, message: "Encounter note deleted successfully" });
+    } catch (err) {
+        console.error("deleteEncounterNote error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export {

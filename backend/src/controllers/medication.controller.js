@@ -1,86 +1,113 @@
-import { createMedication } from "../models/medication.model.js";
-import { medications } from "../data/store.data.js";
+import { Op } from "sequelize";
+import { Medication } from "../models/index.js";
 
-const getAllMedications = (req, res) => {
-    const { category, name }= req.query;
+// GET /api/medications
+const getAllMedications = async (req, res) => {
+    const { category, name } = req.query;
 
-    let result = medications;
-    if(category)
-        result = result.filter(m => m.category.toLowerCase() === category.toLowerCase());
+    try {
+        const where = {};
+        if (category) where.category = { [Op.iLike]: category };
+        if (name)     where.medicationName = { [Op.iLike]: `%${name}%` };
 
-    if(name)
-        result = result.filter(m => m.medicationName.toLowerCase().includes(name.toLowerCase()));
-
-    res.status(200).json({ success: true, count: result.length, data: result });
+        const medications = await Medication.findAll({ where });
+        return res.status(200).json({ success: true, count: medications.length, data: medications });
+    } catch (err) {
+        console.error("getAllMedications error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const getMedicationById = (req, res) => {
-    const medication = medications.find(m => m.id === req.params.id);
-    if(!medication)
-        return res.status(404).json({ success: false, message: "Medication not found" });
+// GET /api/medications/:id
+const getMedicationById = async (req, res) => {
+    try {
+        const medication = await Medication.findByPk(req.params.id);
+        if (!medication)
+            return res.status(404).json({ success: false, message: "Medication not found" });
 
-    res.status(200).json({ success: true, data: medication });
+        return res.status(200).json({ success: true, data: medication });
+    } catch (err) {
+        console.error("getMedicationById error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const createMedicationHandler = (req, res) => {
+// POST /api/medications
+const createMedicationHandler = async (req, res) => {
     const { medicationName, dosage, instructions, category, sideEffects, contraindications } = req.body;
 
     const missing = [];
-    if(!medicationName) missing.push("medicationName");
-    if(!dosage) missing.push("dosage");
-    if(!instructions) missing.push("instructions");
-    if(!category) missing.push("category");
+    if (!medicationName) missing.push("medicationName");
+    if (!dosage)         missing.push("dosage");
+    if (!instructions)   missing.push("instructions");
+    if (!category)       missing.push("category");
 
-    if(missing.length > 0)
-        return res.status(400).json({ success: false, message: `Missing required field ${missing.join(", ")}` });
-    
-    const exists = medications.find(m => m.medicationName.toLowerCase() === medicationName.toLowerCase() && m.dosage.toLowerCase() === dosage.toLowerCase());
-    if(exists)
-        return res.status(409).json({ success: false, message: "Medication with this name and dosage already exists" });
-    
-    if(sideEffects && !Array.isArray(sideEffects))
+    if (missing.length > 0)
+        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
+
+    if (sideEffects && !Array.isArray(sideEffects))
         return res.status(400).json({ success: false, message: "sideEffects must be an array" });
-    if(contraindications && !Array.isArray(contraindications))
+
+    if (contraindications && !Array.isArray(contraindications))
         return res.status(400).json({ success: false, message: "contraindications must be an array" });
 
-    const medication = createMedication({ medicationName, dosage, instructions, category, sideEffects, contraindications });
-    medications.push(medication);
+    try {
+        const exists = await Medication.findOne({
+            where: {
+                medicationName: { [Op.iLike]: medicationName },
+                dosage:         { [Op.iLike]: dosage }
+            }
+        });
+        if (exists)
+            return res.status(409).json({ success: false, message: "Medication with this name and dosage already exists" });
 
-    res.status(201).json({ success: true, data: medication });
+        const medication = await Medication.create({
+            medicationName, dosage, instructions, category,
+            sideEffects:       sideEffects       || [],
+            contraindications: contraindications || []
+        });
+
+        return res.status(201).json({ success: true, data: medication });
+    } catch (err) {
+        console.error("createMedication error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const updateMedication = (req, res) => {
-    const index = medications.findIndex(m => m.id === req.params.id);
-    if(index === -1)
-        return res.status(404).json({ success: false, message: "Medication not found" });
+// PUT /api/medications/:id
+const updateMedication = async (req, res) => {
+    try {
+        const medication = await Medication.findByPk(req.params.id);
+        if (!medication)
+            return res.status(404).json({ success: false, message: "Medication not found" });
 
-    if(req.body.sideEffects && !Array.isArray(req.body.sideEffects))
-        return res.status(400).json({ success: false, message: "sideEffects must be an array" });
-    
-    if(req.body.contraindications && !Array.isArray(req.body.contraindications))
-        return res.status(400).json({ success: false, message: "contraindications must be an array" });
+        if (req.body.sideEffects && !Array.isArray(req.body.sideEffects))
+            return res.status(400).json({ success: false, message: "sideEffects must be an array" });
 
-    medications[index] = {
-        ...medications[index],
-        ...req.body,
-        id: medications[index].id,
-        createdAt: medications[index].createdAt,
-        updatedAt: new Date().toISOString()
-    };
+        if (req.body.contraindications && !Array.isArray(req.body.contraindications))
+            return res.status(400).json({ success: false, message: "contraindications must be an array" });
 
-    res.status(200).json({ success: true, data: medications[index] });
+        await medication.update(req.body);
+        return res.status(200).json({ success: true, data: medication });
+    } catch (err) {
+        console.error("updateMedication error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
-const deleteMedication = (req, res) => {
-    const index = medications.findIndex(m => m.id === req.params.id);
+// DELETE /api/medications/:id  (soft deactivate)
+const deleteMedication = async (req, res) => {
+    try {
+        const medication = await Medication.findByPk(req.params.id);
+        if (!medication)
+            return res.status(404).json({ success: false, message: "Medication not found" });
 
-    if(index === -1)
-        return res.status(404).json({ success: false, message: "Medication not found" });
-
-    medications[index].isActive = false;
-    medications[index].updatedAt = new Date().toISOString();
-
-    res.status(200).json({ success: true, message: "Medication deactivated successfully"});
+        await medication.update({ isActive: false });
+        return res.status(200).json({ success: true, message: "Medication deactivated successfully" });
+    } catch (err) {
+        console.error("deleteMedication error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
 };
 
 export { getAllMedications, getMedicationById, createMedicationHandler, updateMedication, deleteMedication };

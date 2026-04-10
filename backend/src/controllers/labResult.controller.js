@@ -1,5 +1,6 @@
 import { LabResult, LabOrder, Patient, sequelize } from "../models/index.js";
 import { sendCriticalResultAlert } from "../utils/notificationService.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 const VALID_STATUSES = ["Normal", "Abnormal", "Critical"];
 
@@ -12,12 +13,18 @@ const getAllLabResults = async (req, res) => {
         if (labOrderId) where.labOrderId = labOrderId;
         if (status)     where.status     = status;
 
-        const results = await LabResult.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabResult.findAndCountAll({
             where,
             include: [{ model: LabOrder, attributes: ["id", "testType", "orderDate", "patientId", "doctorId"] }],
-            order: [["resultDate", "DESC"]]
+            order: [["resultDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: results.length, data: results });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllLabResults error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -47,8 +54,16 @@ const getLabResultsByOrderId = async (req, res) => {
         if (!labOrder)
             return res.status(404).json({ success: false, message: "Lab order not found" });
 
-        const results = await LabResult.findAll({ where: { labOrderId: req.params.labOrderId } });
-        return res.status(200).json({ success: true, count: results.length, data: results });
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabResult.findAndCountAll({ 
+            where: { labOrderId: req.params.labOrderId },
+            limit,
+            offset
+        });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getLabResultsByOrderId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -58,12 +73,18 @@ const getLabResultsByOrderId = async (req, res) => {
 // GET /api/lab-results/critical
 const getCriticalLabResults = async (req, res) => {
     try {
-        const results = await LabResult.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabResult.findAndCountAll({
             where: { isCritical: true },
             include: [{ model: LabOrder, attributes: ["id", "testType", "patientId", "doctorId"] }],
-            order: [["resultDate", "DESC"]]
+            order: [["resultDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: results.length, data: results });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getCriticalLabResults error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

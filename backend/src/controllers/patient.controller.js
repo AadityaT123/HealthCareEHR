@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { Patient } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 // GET /api/patients
 const getAllPatients = async (req, res) => {
@@ -15,8 +16,16 @@ const getAllPatients = async (req, res) => {
             ];
         }
 
-        const patients = await Patient.findAll({ where });
-        return res.status(200).json({ success: true, count: patients.length, data: patients });
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Patient.findAndCountAll({
+            where,
+            limit,
+            offset
+        });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllPatients error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

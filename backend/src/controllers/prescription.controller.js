@@ -1,6 +1,8 @@
 import { Prescription, Patient, Doctor, Medication, sequelize } from "../models/index.js";
 import integrations from "../integrations/index.js";
 import { checkDrugInteractions } from "../utils/drugInteractionChecker.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
+import GlobalTaskQueue from "../services/queue.service.js";
 
 const VALID_STATUSES = ["Active", "Completed", "Cancelled"];
 
@@ -14,16 +16,22 @@ const getAllPrescriptions = async (req, res) => {
         if (doctorId)  where.doctorId  = doctorId;
         if (status)    where.status    = status;
 
-        const prescriptions = await Prescription.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Prescription.findAndCountAll({
             where,
             include: [
                 { model: Patient,    attributes: ["id", "firstName", "lastName"] },
                 { model: Doctor,     attributes: ["id", "firstName", "lastName"] },
                 { model: Medication, attributes: ["id", "medicationName", "dosage", "category"] }
             ],
-            order: [["prescriptionDate", "DESC"]]
+            order: [["prescriptionDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: prescriptions.length, data: prescriptions });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllPrescriptions error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -57,15 +65,21 @@ const getPrescriptionsByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const prescriptions = await Prescription.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Prescription.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [
                 { model: Medication, attributes: ["id", "medicationName", "dosage"] },
                 { model: Doctor,     attributes: ["id", "firstName", "lastName"] }
             ],
-            order: [["prescriptionDate", "DESC"]]
+            order: [["prescriptionDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: prescriptions.length, data: prescriptions });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getPrescriptionsByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -129,14 +143,22 @@ const createPrescriptionHandler = async (req, res) => {
                 notes
             }, { transaction: t });
 
-            // [Phase 3] Integration: Send to Pharmacy System
-            await integrations.pharmacy.sendPrescription(prescription);
-
             await t.commit();
-            return res.status(201).json({ success: true, data: prescription });
+
+            // [Phase 3] Integration: Offload to background Task Queue
+            GlobalTaskQueue.push({
+                name: `Sync-Prescription-${prescription.id}`,
+                fn: () => integrations.pharmacy.sendPrescription(prescription)
+            });
+
+            return res.status(202).json({ 
+                success: true, 
+                message: "Prescription created and queued for pharmacy synchronization",
+                data: prescription 
+            });
 
         } catch (innerErr) {
-            await t.rollback();
+            if (t) await t.rollback();
             throw innerErr;
         }
 

@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { Doctor } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 // GET /api/doctors
 const getAllDoctors = async (req, res) => {
@@ -9,8 +10,16 @@ const getAllDoctors = async (req, res) => {
         const where = {};
         if (specialization) where.specialization = { [Op.iLike]: specialization };
 
-        const doctors = await Doctor.findAll({ where });
-        return res.status(200).json({ success: true, count: doctors.length, data: doctors });
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Doctor.findAndCountAll({
+            where,
+            limit,
+            offset
+        });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllDoctors error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

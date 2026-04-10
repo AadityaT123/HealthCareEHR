@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { Appointment, Patient, Doctor } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 const VALID_TYPES    = ["Consultation", "Follow-up", "Emergency", "Routine Check-up"];
 const VALID_STATUSES = ["Scheduled", "Completed", "Cancelled", "No-Show"];
@@ -15,15 +16,21 @@ const getAllAppointments = async (req, res) => {
         if (status)          where.status          = status;
         if (appointmentType) where.appointmentType = appointmentType;
 
-        const appointments = await Appointment.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Appointment.findAndCountAll({
             where,
             include: [
                 { model: Patient, attributes: ["id", "firstName", "lastName"] },
                 { model: Doctor,  attributes: ["id", "firstName", "lastName", "specialization"] }
             ],
-            order: [["appointmentDate", "DESC"]]
+            order: [["appointmentDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllAppointments error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -56,12 +63,18 @@ const getAppointmentByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const appointments = await Appointment.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Appointment.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [{ model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] }],
-            order: [["appointmentDate", "DESC"]]
+            order: [["appointmentDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAppointmentByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -75,12 +88,18 @@ const getAppointmentByDoctorId = async (req, res) => {
         if (!doctor)
             return res.status(404).json({ success: false, message: "Doctor not found" });
 
-        const appointments = await Appointment.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await Appointment.findAndCountAll({
             where: { doctorId: req.params.doctorId },
             include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
-            order: [["appointmentDate", "DESC"]]
+            order: [["appointmentDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: appointments.length, data: appointments });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAppointmentByDoctorId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

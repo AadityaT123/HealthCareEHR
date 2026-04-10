@@ -1,4 +1,5 @@
 import { MedicalHistory, Patient } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 // GET /api/medical-history
 const getAllMedicalHistory = async (req, res) => {
@@ -8,12 +9,18 @@ const getAllMedicalHistory = async (req, res) => {
         const where = {};
         if (patientId) where.patientId = patientId;
 
-        const records = await MedicalHistory.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await MedicalHistory.findAndCountAll({
             where,
             include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
-            order: [["diagnosisDate", "DESC"]]
+            order: [["diagnosisDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: records.length, data: records });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllMedicalHistory error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -43,11 +50,17 @@ const getMedicalHistoryByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const records = await MedicalHistory.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await MedicalHistory.findAndCountAll({
             where: { patientId: req.params.patientId },
-            order: [["diagnosisDate", "DESC"]]
+            order: [["diagnosisDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: records.length, data: records });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getMedicalHistoryByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

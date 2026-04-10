@@ -1,4 +1,5 @@
 import { AuditLog, User } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 // GET /api/audit-logs
 const getAllAuditLogs = async (req, res) => {
@@ -17,12 +18,18 @@ const getAllAuditLogs = async (req, res) => {
             if (endDate) where.createdAt.$lte = new Date(endDate);
         }
 
-        const logs = await AuditLog.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await AuditLog.findAndCountAll({
             where,
             include: [{ model: User, attributes: ["id", "username"] }],
             order: [["createdAt", "DESC"]],
-            limit: 1000 // Safely limit results sets to prevent db overwhelm
+            limit,
+            offset
         });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
 
         return res.status(200).json({ success: true, count: logs.length, data: logs });
     } catch (err) {
@@ -36,11 +43,18 @@ const getAuditLogsByResource = async (req, res) => {
     const { resource, resourceId } = req.params;
 
     try {
-        const logs = await AuditLog.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await AuditLog.findAndCountAll({
             where: { resource, resourceId: String(resourceId) },
             include: [{ model: User, attributes: ["id", "username"] }],
-            order: [["createdAt", "DESC"]]
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
 
         return res.status(200).json({ success: true, count: logs.length, data: logs });
     } catch (err) {

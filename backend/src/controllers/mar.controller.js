@@ -1,5 +1,6 @@
 import { Prescription, Medication, Patient, User } from "../models/index.js";
 import MAR from "../models/mar.model.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 const VALID_ROUTES   = ["Oral", "IV", "IM", "Subcutaneous", "Topical", "Inhaled", "Sublingual", "Rectal"];
 const VALID_STATUSES = ["Given", "Missed", "Delayed", "Refused", "Held"];
@@ -16,7 +17,9 @@ const getAllMAREntries = async (req, res) => {
         if (status)         where.status         = status;
         if (administeredBy) where.administeredBy = administeredBy;
 
-        const entries = await MAR.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await MAR.findAndCountAll({
             where,
             include: [
                 { model: Patient,       attributes: ["id", "firstName", "lastName"] },
@@ -24,10 +27,13 @@ const getAllMAREntries = async (req, res) => {
                 { model: Medication,    attributes: ["id", "medicationName", "dosage"] },
                 { model: User,          as: "administrator", attributes: ["id", "username"] }
             ],
-            order: [["scheduledAt", "DESC"]]
+            order: [["scheduledAt", "DESC"]],
+            limit,
+            offset
         });
 
-        return res.status(200).json({ success: true, count: entries.length, data: entries });
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllMAREntries error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -63,17 +69,22 @@ const getMARByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const entries = await MAR.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await MAR.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [
                 { model: Medication,   attributes: ["id", "medicationName"] },
                 { model: Prescription, attributes: ["id", "frequency", "duration"] },
                 { model: User,         as: "administrator", attributes: ["id", "username"] }
             ],
-            order: [["scheduledAt", "DESC"]]
+            order: [["scheduledAt", "DESC"]],
+            limit,
+            offset
         });
 
-        return res.status(200).json({ success: true, count: entries.length, data: entries });
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getMARByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

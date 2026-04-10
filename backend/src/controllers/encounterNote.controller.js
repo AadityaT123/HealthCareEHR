@@ -1,4 +1,5 @@
 import { EncounterNote, Patient, Doctor, Appointment, sequelize } from "../models/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
 
 // GET /api/encounters
 const getAllEncounterNotes = async (req, res) => {
@@ -10,16 +11,22 @@ const getAllEncounterNotes = async (req, res) => {
         if (doctorId) where.doctorId = doctorId;
         if (appointmentId) where.appointmentId = appointmentId;
 
-        const notes = await EncounterNote.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await EncounterNote.findAndCountAll({
             where,
             include: [
                 { model: Patient, attributes: ["id", "firstName", "lastName"] },
                 { model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] },
                 { model: Appointment, attributes: ["id", "appointmentDate", "appointmentType"] }
             ],
-            order: [["encounterDate", "DESC"]]
+            order: [["encounterDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: notes.length, data: notes });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllEncounterNotes error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -53,12 +60,18 @@ const getEncounterNotesByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const notes = await EncounterNote.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await EncounterNote.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [{ model: Doctor, attributes: ["id", "firstName", "lastName"] }],
-            order: [["encounterDate", "DESC"]]
+            order: [["encounterDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: notes.length, data: notes });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getEncounterNotesByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -72,12 +85,18 @@ const getEncounterNotesByDoctorId = async (req, res) => {
         if (!doctor)
             return res.status(404).json({ success: false, message: "Doctor not found" });
 
-        const notes = await EncounterNote.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await EncounterNote.findAndCountAll({
             where: { doctorId: req.params.doctorId },
             include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
-            order: [["encounterDate", "DESC"]]
+            order: [["encounterDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: notes.length, data: notes });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getEncounterNotesByDoctorId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

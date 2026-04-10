@@ -1,5 +1,7 @@
 import { LabOrder, Patient, Doctor, sequelize } from "../models/index.js";
 import integrations from "../integrations/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
+import GlobalTaskQueue from "../services/queue.service.js";
 
 const VALID_TEST_TYPES = ["Blood Test", "Urine Test", "X-Ray", "MRI", "CT Scan", "Ultrasound", "ECG", "Biopsy"];
 const VALID_PRIORITIES = ["Routine", "Urgent", "STAT"];
@@ -17,15 +19,21 @@ const getAllLabOrders = async (req, res) => {
         if (priority)  where.priority  = priority;
         if (testType)  where.testType  = testType;
 
-        const labOrders = await LabOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabOrder.findAndCountAll({
             where,
             include: [
                 { model: Patient, attributes: ["id", "firstName", "lastName"] },
                 { model: Doctor,  attributes: ["id", "firstName", "lastName", "specialization"] }
             ],
-            order: [["orderDate", "DESC"]]
+            order: [["orderDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: labOrders.length, data: labOrders });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllLabOrders error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -58,12 +66,18 @@ const getLabOrdersByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const labOrders = await LabOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabOrder.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [{ model: Doctor, attributes: ["id", "firstName", "lastName"] }],
-            order: [["orderDate", "DESC"]]
+            order: [["orderDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: labOrders.length, data: labOrders });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getLabOrdersByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -77,12 +91,18 @@ const getLabOrdersByDoctorId = async (req, res) => {
         if (!doctor)
             return res.status(404).json({ success: false, message: "Doctor not found" });
 
-        const labOrders = await LabOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await LabOrder.findAndCountAll({
             where: { doctorId: req.params.doctorId },
             include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
-            order: [["orderDate", "DESC"]]
+            order: [["orderDate", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, count: labOrders.length, data: labOrders });
+
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getLabOrdersByDoctorId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -128,14 +148,22 @@ const createLabOrderHandler = async (req, res) => {
                 notes
             }, { transaction: t });
 
-            // [Phase 3] Integration: Send to LIS
-            await integrations.lis.sendLabOrder(labOrder);
-
             await t.commit();
-            return res.status(201).json({ success: true, data: labOrder });
+
+            // [Phase 3] Integration: Offload to background Task Queue
+            GlobalTaskQueue.push({
+                name: `Sync-LabOrder-${labOrder.id}`,
+                fn: () => integrations.lis.sendLabOrder(labOrder)
+            });
+
+            return res.status(202).json({ 
+                success: true, 
+                message: "Lab order created and queued for LIS synchronization",
+                data: labOrder 
+            });
 
         } catch (innerErr) {
-            await t.rollback();
+            if (t) await t.rollback();
             throw innerErr;
         }
 

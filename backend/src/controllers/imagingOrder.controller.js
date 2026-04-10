@@ -1,5 +1,7 @@
 import { ImagingOrder, Patient, Doctor, EncounterNote, sequelize } from "../models/index.js";
 import integrations from "../integrations/index.js";
+import { getPagination, getPagingData } from "../utils/pagination.js";
+import GlobalTaskQueue from "../services/queue.service.js";
 
 const VALID_IMAGING_TYPES = ["X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography"];
 const VALID_PRIORITIES     = ["Routine", "Urgent", "STAT"];
@@ -17,17 +19,22 @@ const getAllImagingOrders = async (req, res) => {
         if (priority)    where.priority    = priority;
         if (status)      where.status      = status;
 
-        const orders = await ImagingOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await ImagingOrder.findAndCountAll({
             where,
             include: [
                 { model: Patient,       attributes: ["id", "firstName", "lastName"] },
                 { model: Doctor,        attributes: ["id", "firstName", "lastName", "specialization"] },
                 { model: EncounterNote, as: "encounter", attributes: ["id", "encounterDate", "chiefComplaint"], required: false }
             ],
-            order: [["createdAt", "DESC"]]
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
 
-        return res.status(200).json({ success: true, count: orders.length, data: orders });
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getAllImagingOrders error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -62,13 +69,18 @@ const getImagingOrdersByPatientId = async (req, res) => {
         if (!patient)
             return res.status(404).json({ success: false, message: "Patient not found" });
 
-        const orders = await ImagingOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await ImagingOrder.findAndCountAll({
             where: { patientId: req.params.patientId },
             include: [{ model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] }],
-            order: [["createdAt", "DESC"]]
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
 
-        return res.status(200).json({ success: true, count: orders.length, data: orders });
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getImagingOrdersByPatientId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -82,13 +94,18 @@ const getImagingOrdersByDoctorId = async (req, res) => {
         if (!doctor)
             return res.status(404).json({ success: false, message: "Doctor not found" });
 
-        const orders = await ImagingOrder.findAll({
+        const { limit, offset, page } = getPagination(req.query, 50);
+
+        const data = await ImagingOrder.findAndCountAll({
             where: { doctorId: req.params.doctorId },
             include: [{ model: Patient, attributes: ["id", "firstName", "lastName"] }],
-            order: [["createdAt", "DESC"]]
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
 
-        return res.status(200).json({ success: true, count: orders.length, data: orders });
+        const response = getPagingData(data, page, limit);
+        return res.status(200).json({ success: true, ...response });
     } catch (err) {
         console.error("getImagingOrdersByDoctorId error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -145,24 +162,34 @@ const createImagingOrderHandler = async (req, res) => {
                 scheduledAt:    scheduledAt || null
             }, { transaction: t });
 
-            // [Phase 3] Integration: Upload metadata to PACS system
-            const pacsRes = await integrations.pacs.uploadImaging(order.id, {
-                patientId,
-                imagingType,
-                bodyPart,
-                clinicalReason
+            await t.commit();
+
+            // [Phase 3] Integration: Offload to background Task Queue
+            GlobalTaskQueue.push({
+                name: `Sync-ImagingOrder-${order.id}`,
+                fn: async () => {
+                    const pacsRes = await integrations.pacs.uploadImaging(order.id, {
+                        patientId,
+                        imagingType,
+                        bodyPart,
+                        clinicalReason
+                    });
+
+                    if (pacsRes.success) {
+                        await order.update({ resultUrl: pacsRes.pacsUrl });
+                        console.log(`[Queue] Updated ImagingOrder ${order.id} with PACS URL`);
+                    }
+                }
             });
 
-            // Store the external system URL/UID inside the local database order record securely
-            if (pacsRes.success) {
-                await order.update({ resultUrl: pacsRes.pacsUrl }, { transaction: t });
-            }
-
-            await t.commit();
-            return res.status(201).json({ success: true, data: order });
+            return res.status(202).json({ 
+                success: true, 
+                message: "Imaging order created and queued for PACS synchronization",
+                data: order 
+            });
             
         } catch (innerErr) {
-            await t.rollback();
+            if (t) await t.rollback();
             throw innerErr; // Handled by outer catch
         }
     } catch (err) {

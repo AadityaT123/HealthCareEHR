@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import 'dotenv/config';
 
+import { sanitizerMiddleware } from './middlewares/sanitizer.middleware.js';
+
 import { connectDB } from "./config/database.js";
 
 import patientRoutes           from './routes/patient.route.js';
@@ -43,6 +45,7 @@ app.use(helmet());
 app.use(cors({ origin: "*", credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json());
+app.use(sanitizerMiddleware);
 
 // ── Rate Limiting (Security via 4.6) ───────────────────────────────────────────
 app.use("/portal", portalLimiter);          // Broad limiter on all portal routes

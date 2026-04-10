@@ -16,7 +16,7 @@ const LabOrder = sequelize.define("LabOrder", {
         allowNull: false
     },
     testType: {
-        type: DataTypes.ENUM("Blood Test", "Urine Test", "X-Ray", "MRI", "CT Scan", "Ultrasound", "ECG", "Biopsy"),
+        type: DataTypes.ENUM("Blood Test", "Urine Test", "ECG", "Biopsy"),
         allowNull: false
     },
     orderDate: {

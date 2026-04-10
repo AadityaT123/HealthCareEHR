@@ -19,6 +19,9 @@ import labOrderRoutes          from './routes/labOrder.route.js';
 import labResultRoutes         from './routes/labResult.route.js';
 import progressNoteRoutes      from './routes/progressNote.route.js';
 import documentTemplateRoutes  from './routes/documentTemplate.route.js';
+import imagingOrderRoutes       from './routes/imagingOrder.route.js';
+import marRoutes                from './routes/mar.route.js';
+import medReconciliationRoutes  from './routes/medicationReconciliation.route.js';
 
 import errorHandler from "./middlewares/errorHandler.middleware.js";
 
@@ -52,8 +55,11 @@ app.use('/api/encounters',      encounterNoteRoutes);
 app.use('/api/prescriptions',   prescriptionRoutes);
 app.use('/api/lab-orders',       labOrderRoutes);
 app.use('/api/lab-results',      labResultRoutes);
-app.use('/api/progress-notes',   progressNoteRoutes);
-app.use('/api/templates',        documentTemplateRoutes);
+app.use('/api/progress-notes',           progressNoteRoutes);
+app.use('/api/templates',                documentTemplateRoutes);
+app.use('/api/imaging-orders',           imagingOrderRoutes);
+app.use('/api/mar',                      marRoutes);
+app.use('/api/medication-reconciliation',medReconciliationRoutes);
 
 // ── Error Handlers ─────────────────────────────────────────────────────────────
 app.use(errorHandler);

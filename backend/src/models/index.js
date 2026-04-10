@@ -1,16 +1,19 @@
-import Role             from "./role.model.js";
-import User             from "./user.model.js";
-import Patient          from "./patient.model.js";
-import Doctor           from "./doctor.model.js";
-import Medication       from "./medication.model.js";
-import MedicalHistory   from "./medicalHistory.model.js";
-import Appointment      from "./appointment.model.js";
-import EncounterNote    from "./encounterNote.model.js";
-import Prescription     from "./prescription.model.js";
-import LabOrder         from "./labOrder.model.js";
-import LabResult        from "./labResult.model.js";
-import ProgressNote     from "./progressNote.model.js";
-import DocumentTemplate from "./documentTemplate.model.js";
+import Role                      from "./role.model.js";
+import User                      from "./user.model.js";
+import Patient                   from "./patient.model.js";
+import Doctor                    from "./doctor.model.js";
+import Medication                from "./medication.model.js";
+import MedicalHistory            from "./medicalHistory.model.js";
+import Appointment               from "./appointment.model.js";
+import EncounterNote             from "./encounterNote.model.js";
+import Prescription              from "./prescription.model.js";
+import LabOrder                  from "./labOrder.model.js";
+import LabResult                 from "./labResult.model.js";
+import ProgressNote              from "./progressNote.model.js";
+import DocumentTemplate          from "./documentTemplate.model.js";
+import ImagingOrder              from "./imagingOrder.model.js";
+import MAR                       from "./mar.model.js";
+import MedicationReconciliation  from "./medicationReconciliation.model.js";
 
 // Role → Users
 Role.hasMany(User,    { foreignKey: "roleId", onDelete: "RESTRICT" });
@@ -67,9 +70,44 @@ ProgressNote.belongsTo(EncounterNote, { foreignKey: "encounterId", as: "encounte
 User.hasMany(DocumentTemplate,          { foreignKey: "createdBy", onDelete: "RESTRICT" });
 DocumentTemplate.belongsTo(User,        { foreignKey: "createdBy", as: "creator" });
 
+// ImagingOrder associations
+Patient.hasMany(ImagingOrder,           { foreignKey: "patientId", onDelete: "CASCADE" });
+ImagingOrder.belongsTo(Patient,         { foreignKey: "patientId" });
+
+Doctor.hasMany(ImagingOrder,            { foreignKey: "doctorId",  onDelete: "RESTRICT" });
+ImagingOrder.belongsTo(Doctor,          { foreignKey: "doctorId" });
+
+// Optional link: EncounterNote → ImagingOrder
+EncounterNote.hasMany(ImagingOrder,     { foreignKey: "encounterId", onDelete: "SET NULL" });
+ImagingOrder.belongsTo(EncounterNote,   { foreignKey: "encounterId", as: "encounter" });
+
+// MAR (Medication Administration Record) associations
+Patient.hasMany(MAR,                    { foreignKey: "patientId",      onDelete: "CASCADE" });
+MAR.belongsTo(Patient,                  { foreignKey: "patientId" });
+
+Prescription.hasMany(MAR,               { foreignKey: "prescriptionId", onDelete: "CASCADE" });
+MAR.belongsTo(Prescription,             { foreignKey: "prescriptionId" });
+
+Medication.hasMany(MAR,                 { foreignKey: "medicationId",   onDelete: "RESTRICT" });
+MAR.belongsTo(Medication,               { foreignKey: "medicationId" });
+
+User.hasMany(MAR,                       { foreignKey: "administeredBy",  onDelete: "RESTRICT" });
+MAR.belongsTo(User,                     { foreignKey: "administeredBy",  as: "administrator" });
+
+// MedicationReconciliation associations
+Patient.hasMany(MedicationReconciliation,      { foreignKey: "patientId",   onDelete: "CASCADE" });
+MedicationReconciliation.belongsTo(Patient,    { foreignKey: "patientId" });
+
+User.hasMany(MedicationReconciliation,         { foreignKey: "reconciledBy", onDelete: "RESTRICT" });
+MedicationReconciliation.belongsTo(User,       { foreignKey: "reconciledBy", as: "reconciler" });
+
+EncounterNote.hasMany(MedicationReconciliation, { foreignKey: "encounterId", onDelete: "SET NULL" });
+MedicationReconciliation.belongsTo(EncounterNote, { foreignKey: "encounterId" });
+
 export {
     Role, User, Patient, Doctor, Medication,
     MedicalHistory, Appointment, EncounterNote,
     Prescription, LabOrder, LabResult,
-    ProgressNote, DocumentTemplate
+    ProgressNote, DocumentTemplate,
+    ImagingOrder, MAR, MedicationReconciliation
 };

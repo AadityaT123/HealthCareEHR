@@ -50,7 +50,8 @@ const MAR = sequelize.define("MAR", {
     }
 }, {
     tableName: "medication_administration_records",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default MAR;

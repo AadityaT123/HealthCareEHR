@@ -53,7 +53,8 @@ const DocumentTemplate = sequelize.define("DocumentTemplate", {
     }
 }, {
     tableName: "document_templates",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default DocumentTemplate;

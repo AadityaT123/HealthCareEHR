@@ -60,7 +60,7 @@ export const patientLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const portalUser = await PortalUser.findOne({ 
+        const portalUser = await PortalUser.unscoped().findOne({ 
             where: { email },
             include: [{ model: Patient, attributes: ["firstName", "lastName"] }] 
         });

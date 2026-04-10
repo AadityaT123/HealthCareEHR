@@ -33,7 +33,8 @@ const Appointment = sequelize.define("Appointment", {
     }
 }, {
     tableName: "appointments",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default Appointment;

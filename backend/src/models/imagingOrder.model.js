@@ -58,7 +58,8 @@ const ImagingOrder = sequelize.define("ImagingOrder", {
     }
 }, {
     tableName: "imaging_orders",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default ImagingOrder;

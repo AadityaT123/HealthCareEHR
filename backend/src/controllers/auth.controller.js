@@ -55,7 +55,7 @@ const login = async (req, res) => {
         return res.status(400).json({ success: false, message: "Username and password are required" });
 
     try {
-        const user = await User.findOne({
+        const user = await User.unscoped().findOne({
             where: { username: username.toLowerCase() },
             include: [{ model: Role, attributes: ["roleName"] }]
         });

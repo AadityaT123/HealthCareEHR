@@ -42,7 +42,8 @@ const EncounterNote = sequelize.define("EncounterNote", {
     }
 }, {
     tableName: "encounter_notes",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default EncounterNote;

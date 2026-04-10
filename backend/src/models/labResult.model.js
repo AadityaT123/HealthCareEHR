@@ -42,7 +42,8 @@ const LabResult = sequelize.define("LabResult", {
     }
 }, {
     tableName: "lab_results",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default LabResult;

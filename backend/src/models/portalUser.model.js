@@ -59,6 +59,10 @@ const PortalUser = sequelize.define(
     {
         tableName: "portal_users",
         timestamps: true,
+        paranoid: true,
+        defaultScope: {
+            attributes: { exclude: ["passwordHash", "verificationToken", "resetToken", "resetTokenExpiry"] }
+        }
     }
 );
 

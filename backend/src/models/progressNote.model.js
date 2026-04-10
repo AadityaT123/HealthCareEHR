@@ -59,7 +59,8 @@ const ProgressNote = sequelize.define("ProgressNote", {
     }
 }, {
     tableName: "progress_notes",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default ProgressNote;

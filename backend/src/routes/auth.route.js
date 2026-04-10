@@ -4,7 +4,7 @@ import { protect, authorize } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-router.post("/register", register);
+router.post("/register", protect, authorize("Admin"), register);
 router.post("/login", login);
 router.get("/me", protect, getMe);
 router.put("/deactivate/:id", protect, authorize("Admin"), deactivateUser);

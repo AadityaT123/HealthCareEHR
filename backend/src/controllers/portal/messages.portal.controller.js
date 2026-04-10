@@ -1,17 +1,31 @@
 import { Message, User } from "../../models/index.js";
+import { getPagination } from "../../utils/pagination.js";
 
 // GET /portal/messages (Inbox)
 export const getInbox = async (req, res) => {
     try {
-        const messages = await Message.findAll({
+        const { limit, offset } = getPagination(req.query.page, req.query.limit);
+
+        const { count, rows } = await Message.findAndCountAll({
             where: { 
                 portalUserId: req.portalUser.portalUserId,
                 direction: "staff-to-patient"
             },
-            include: [{ model: User, attributes: ["firstName", "lastName", "roleName"] }],
-            order: [["createdAt", "DESC"]]
+            include: [{ model: User, attributes: ["firstName", "lastName"] }],
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, data: messages });
+
+        return res.status(200).json({ 
+            success: true, 
+            items: rows,
+            meta: {
+                totalItems: count,
+                totalPages: Math.ceil(count / limit),
+                currentPage: parseInt(req.query.page) || 1
+            }
+        });
     } catch (err) {
         console.error("getInbox error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -21,15 +35,28 @@ export const getInbox = async (req, res) => {
 // GET /portal/messages/sent
 export const getSentMessages = async (req, res) => {
     try {
-        const messages = await Message.findAll({
+        const { limit, offset } = getPagination(req.query.page, req.query.limit);
+
+        const { count, rows } = await Message.findAndCountAll({
             where: { 
                 portalUserId: req.portalUser.portalUserId,
                 direction: "patient-to-staff"
             },
-            include: [{ model: User, attributes: ["firstName", "lastName", "roleName"] }],
-            order: [["createdAt", "DESC"]]
+            include: [{ model: User, attributes: ["firstName", "lastName"] }],
+            order: [["createdAt", "DESC"]],
+            limit,
+            offset
         });
-        return res.status(200).json({ success: true, data: messages });
+
+        return res.status(200).json({ 
+            success: true, 
+            items: rows,
+            meta: {
+                totalItems: count,
+                totalPages: Math.ceil(count / limit),
+                currentPage: parseInt(req.query.page) || 1
+            }
+        });
     } catch (err) {
         console.error("getSentMessages error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

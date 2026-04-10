@@ -4,7 +4,24 @@ import { logAction } from "../utils/auditLogger.js";
  * Global Audit Middleware
  * Intercepts POST, PUT, PATCH, and DELETE requests and logs them asynchronously
  * after the response finishes.
+ * 
+ * Captures request payloads while redacting PII/Security fields (passwords, tokens).
  */
+const SENSITIVE_FIELDS = ["password", "passwordHash", "token", "verificationToken", "resetToken", "token"];
+
+const redact = (obj) => {
+    if (!obj || typeof obj !== "object") return obj;
+    const redacted = { ...obj };
+    for (const key in redacted) {
+        if (SENSITIVE_FIELDS.some(f => key.toLowerCase().includes(f.toLowerCase()))) {
+            redacted[key] = "[REDACTED]";
+        } else if (typeof redacted[key] === "object") {
+            redacted[key] = redact(redacted[key]);
+        }
+    }
+    return redacted;
+};
+
 export const auditLogMiddleware = (req, res, next) => {
     // Only intercept mutating write requests
     if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -45,14 +62,14 @@ export const auditLogMiddleware = (req, res, next) => {
 
                 // Fire async audit logger safely
                 await logAction({
-                    userId: req.user ? req.user.id : null,
+                    userId: req.user ? req.user.id : (req.portalUser ? req.portalUser.id : null),
                     action,
                     resource,
                     resourceId,
                     details: { 
                         method: req.method,
                         originalUrl: req.originalUrl,
-                        bodyKeys: Object.keys(req.body || {})
+                        payload: redact(req.body)
                     },
                     ipAddress: req.ip
                 });

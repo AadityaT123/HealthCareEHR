@@ -37,7 +37,8 @@ const LabOrder = sequelize.define("LabOrder", {
     }
 }, {
     tableName: "lab_orders",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default LabOrder;

@@ -137,16 +137,27 @@ const createAppointmentHandler = async (req, res) => {
         if (!doctor.isActive)
             return res.status(400).json({ success: false, message: "Doctor is not active" });
 
-        // Check for scheduling conflicts
+        // Check for scheduling conflicts (Real-life: 15-minute buffer)
+        const dateObj = new Date(appointmentDate);
+        const bufferMillis = 15 * 60 * 1000;
+        const windowStart = new Date(dateObj.getTime() - bufferMillis);
+        const windowEnd   = new Date(dateObj.getTime() + bufferMillis);
+
         const conflict = await Appointment.findOne({
             where: {
                 doctorId,
-                appointmentDate,
-                status: "Scheduled"
+                status: "Scheduled",
+                appointmentDate: {
+                    [Op.between]: [windowStart, windowEnd]
+                }
             }
         });
+
         if (conflict)
-            return res.status(409).json({ success: false, message: "Doctor has another scheduled appointment at the same time" });
+            return res.status(409).json({ 
+                success: false, 
+                message: "Doctor has another scheduled appointment within a 15-minute window of this request." 
+            });
 
         const appointment = await Appointment.create({
             patientId, doctorId, appointmentDate,

@@ -38,6 +38,23 @@ class TaskQueue {
             idle: this.queue.idle()
         };
     }
+
+    /**
+     * Wait for all pending and currently running tasks to finish.
+     * Returns a Promise that resolves when the queue is idle.
+     */
+    async waitForDrain() {
+        if (this.queue.idle()) return Promise.resolve();
+
+        console.log(`[Queue] Waiting for ${this.queue.length()} pending and ${this.queue.running()} running tasks to drain...`);
+        
+        return new Promise((resolve) => {
+            this.queue.drain(() => {
+                console.log("[Queue] All tasks completed successfully.");
+                resolve();
+            });
+        });
+    }
 }
 
 const GlobalTaskQueue = new TaskQueue();

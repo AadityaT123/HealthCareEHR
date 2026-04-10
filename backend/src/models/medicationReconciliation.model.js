@@ -56,7 +56,8 @@ const MedicationReconciliation = sequelize.define("MedicationReconciliation", {
     }
 }, {
     tableName: "medication_reconciliations",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default MedicationReconciliation;

@@ -25,7 +25,8 @@ const MedicalHistory = sequelize.define("MedicalHistory", {
     }
 }, {
     tableName: "medical_histories",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default MedicalHistory;

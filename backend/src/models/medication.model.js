@@ -37,7 +37,8 @@ const Medication = sequelize.define("Medication", {
     }
 }, {
     tableName: "medications",
-    timestamps: true
+    timestamps: true,
+    paranoid: true
 });
 
 export default Medication;

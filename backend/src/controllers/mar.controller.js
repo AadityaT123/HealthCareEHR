@@ -181,6 +181,23 @@ const createMAREntry = async (req, res) => {
         if (medication.id !== prescription.medicationId)
             return res.status(400).json({ success: false, message: "Medication does not match the prescription" });
 
+        // Safeguard: Prevent duplicate administration entries for the same dose (Real-life safety)
+        if (status === "Given") {
+            const existingEntry = await MAR.findOne({
+                where: {
+                    prescriptionId,
+                    scheduledAt,
+                    status: "Given"
+                }
+            });
+            if (existingEntry) {
+                return res.status(409).json({ 
+                    success: false, 
+                    message: `A medication dose for this prescription at ${scheduledAt} has already been recorded as "Given". Duplicate administration blocked.`
+                });
+            }
+        }
+
         const entry = await MAR.create({
             patientId,
             prescriptionId,

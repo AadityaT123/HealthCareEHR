@@ -1,5 +1,5 @@
-import { Op } from "sequelize";
-import { ImagingOrder, Patient, Doctor, EncounterNote } from "../models/index.js";
+import { ImagingOrder, Patient, Doctor, EncounterNote, sequelize } from "../models/index.js";
+import integrations from "../integrations/index.js";
 
 const VALID_IMAGING_TYPES = ["X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography"];
 const VALID_PRIORITIES     = ["Routine", "Urgent", "STAT"];
@@ -132,19 +132,45 @@ const createImagingOrderHandler = async (req, res) => {
                 return res.status(400).json({ success: false, message: "Encounter does not belong to this patient" });
         }
 
-        const order = await ImagingOrder.create({
-            patientId, doctorId,
-            encounterId:    encounterId || null,
-            imagingType,
-            bodyPart,
-            priority:       priority || "Routine",
-            clinicalReason: clinicalReason || null,
-            scheduledAt:    scheduledAt || null
-        });
+        const t = await sequelize.transaction();
 
-        return res.status(201).json({ success: true, data: order });
+        try {
+            const order = await ImagingOrder.create({
+                patientId, doctorId,
+                encounterId:    encounterId || null,
+                imagingType,
+                bodyPart,
+                priority:       priority || "Routine",
+                clinicalReason: clinicalReason || null,
+                scheduledAt:    scheduledAt || null
+            }, { transaction: t });
+
+            // [Phase 3] Integration: Upload metadata to PACS system
+            const pacsRes = await integrations.pacs.uploadImaging(order.id, {
+                patientId,
+                imagingType,
+                bodyPart,
+                clinicalReason
+            });
+
+            // Store the external system URL/UID inside the local database order record securely
+            if (pacsRes.success) {
+                await order.update({ resultUrl: pacsRes.pacsUrl }, { transaction: t });
+            }
+
+            await t.commit();
+            return res.status(201).json({ success: true, data: order });
+            
+        } catch (innerErr) {
+            await t.rollback();
+            throw innerErr; // Handled by outer catch
+        }
     } catch (err) {
-        console.error("createImagingOrder error:", err);
+        console.error("createImagingOrder error:", err.message || err);
+        // Distinguish between mocked adapter failures and real 500s
+        if (err.message && err.message.includes("Mock")) {
+            return res.status(502).json({ success: false, message: "External PACS Integration Failed. Operation rolled back." });
+        }
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };

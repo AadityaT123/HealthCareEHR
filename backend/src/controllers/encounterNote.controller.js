@@ -1,4 +1,5 @@
 import { EncounterNote, Patient, Doctor, Appointment, sequelize } from "../models/index.js";
+import { logAction } from "../utils/auditLogger.js";
 
 // GET /api/encounters
 const getAllEncounterNotes = async (req, res) => {
@@ -135,6 +136,15 @@ const createEncounterNoteHandler = async (req, res) => {
         await appointment.update({ status: "Completed" }, { transaction: t });
 
         await t.commit();
+
+        await logAction({
+            userId: req.user ? req.user.id : null,
+            action: "CREATE",
+            resource: "EncounterNote",
+            resourceId: note.id,
+            details: { diagnosis, appointmentId },
+            ipAddress: req.ip
+        });
 
         return res.status(201).json({ success: true, data: note });
     } catch (err) {

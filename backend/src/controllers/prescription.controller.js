@@ -1,4 +1,5 @@
-import { Prescription, Patient, Doctor, Medication } from "../models/index.js";
+import { Prescription, Patient, Doctor, Medication, sequelize } from "../models/index.js";
+import integrations from "../integrations/index.js";
 import { checkDrugInteractions } from "../utils/drugInteractionChecker.js";
 
 const VALID_STATUSES = ["Active", "Completed", "Cancelled"];
@@ -119,16 +120,31 @@ const createPrescriptionHandler = async (req, res) => {
                 interactions
             });
 
-        const prescription = await Prescription.create({
-            patientId, doctorId, medicationId, prescriptionDate,
-            dosage, frequency, duration,
-            refills: refills || 0,
-            notes
-        });
+        const t = await sequelize.transaction();
+        try {
+            const prescription = await Prescription.create({
+                patientId, doctorId, medicationId, prescriptionDate,
+                dosage, frequency, duration,
+                refills: refills || 0,
+                notes
+            }, { transaction: t });
 
-        return res.status(201).json({ success: true, data: prescription });
+            // [Phase 3] Integration: Send to Pharmacy System
+            await integrations.pharmacy.sendPrescription(prescription);
+
+            await t.commit();
+            return res.status(201).json({ success: true, data: prescription });
+
+        } catch (innerErr) {
+            await t.rollback();
+            throw innerErr;
+        }
+
     } catch (err) {
-        console.error("createPrescription error:", err);
+        console.error("createPrescription error:", err.message || err);
+        if (err.message && err.message.includes("Mock")) {
+            return res.status(502).json({ success: false, message: "External Pharmacy Integration Failed. Operation rolled back." });
+        }
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };

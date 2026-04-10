@@ -15,10 +15,15 @@ import DocumentTemplate          from "./documentTemplate.model.js";
 import ImagingOrder              from "./imagingOrder.model.js";
 import MAR                       from "./mar.model.js";
 import MedicationReconciliation  from "./medicationReconciliation.model.js";
+import AuditLog                  from "./auditLog.model.js";
 
 // Role → Users
 Role.hasMany(User,    { foreignKey: "roleId", onDelete: "RESTRICT" });
 User.belongsTo(Role,  { foreignKey: "roleId" });
+
+// User → AuditLogs
+User.hasMany(AuditLog,    { foreignKey: "userId", onDelete: "SET NULL" });
+AuditLog.belongsTo(User,  { foreignKey: "userId" });
 
 // Patient associations
 Patient.hasMany(MedicalHistory, { foreignKey: "patientId", onDelete: "CASCADE" });
@@ -111,5 +116,6 @@ export {
     Prescription, LabOrder, LabResult,
     ProgressNote, DocumentTemplate,
     ImagingOrder, MAR, MedicationReconciliation,
+    AuditLog,
     sequelize
 };

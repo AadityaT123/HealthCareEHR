@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { Patient } from "../models/index.js";
+import { logAction } from "../utils/auditLogger.js";
 
 // GET /api/patients
 const getAllPatients = async (req, res) => {
@@ -79,6 +80,15 @@ const createPatientHandler = async (req, res) => {
             }
         });
 
+        await logAction({
+            userId: req.user ? req.user.id : null,
+            action: "CREATE",
+            resource: "Patient",
+            resourceId: patient.id,
+            details: { name: `${firstName} ${lastName}` },
+            ipAddress: req.ip
+        });
+
         return res.status(201).json({ success: true, message: "Patient created successfully", data: patient });
     } catch (err) {
         console.error("createPatient error:", err);
@@ -120,6 +130,15 @@ const updatePatient = async (req, res) => {
             })
         });
 
+        await logAction({
+            userId: req.user ? req.user.id : null,
+            action: "UPDATE",
+            resource: "Patient",
+            resourceId: patient.id,
+            details: { updatedFields: Object.keys(req.body) },
+            ipAddress: req.ip
+        });
+
         return res.status(200).json({ success: true, message: "Patient updated successfully", data: patient });
     } catch (err) {
         console.error("updatePatient error:", err);
@@ -135,6 +154,16 @@ const deletePatient = async (req, res) => {
             return res.status(404).json({ success: false, message: `Patient with ID ${req.params.id} not found` });
 
         await patient.destroy();
+
+        await logAction({
+            userId: req.user ? req.user.id : null,
+            action: "DELETE",
+            resource: "Patient",
+            resourceId: patient.id,
+            details: { name: `${patient.firstName} ${patient.lastName}` },
+            ipAddress: req.ip
+        });
+
         return res.status(200).json({ success: true, message: "Patient deleted successfully" });
     } catch (err) {
         console.error("deletePatient error:", err);

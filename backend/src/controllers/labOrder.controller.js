@@ -1,4 +1,5 @@
-import { LabOrder, Patient, Doctor } from "../models/index.js";
+import { LabOrder, Patient, Doctor, sequelize } from "../models/index.js";
+import integrations from "../integrations/index.js";
 
 const VALID_TEST_TYPES = ["Blood Test", "Urine Test", "X-Ray", "MRI", "CT Scan", "Ultrasound", "ECG", "Biopsy"];
 const VALID_PRIORITIES = ["Routine", "Urgent", "STAT"];
@@ -118,14 +119,31 @@ const createLabOrderHandler = async (req, res) => {
         if (!doctor.isActive)
             return res.status(400).json({ success: false, message: "Doctor is not active" });
 
-        const labOrder = await LabOrder.create({
-            patientId, doctorId, testType, orderDate,
-            priority: priority || "Routine",
-            notes
-        });
-        return res.status(201).json({ success: true, data: labOrder });
+        const t = await sequelize.transaction();
+
+        try {
+            const labOrder = await LabOrder.create({
+                patientId, doctorId, testType, orderDate,
+                priority: priority || "Routine",
+                notes
+            }, { transaction: t });
+
+            // [Phase 3] Integration: Send to LIS
+            await integrations.lis.sendLabOrder(labOrder);
+
+            await t.commit();
+            return res.status(201).json({ success: true, data: labOrder });
+
+        } catch (innerErr) {
+            await t.rollback();
+            throw innerErr;
+        }
+
     } catch (err) {
-        console.error("createLabOrder error:", err);
+        console.error("createLabOrder error:", err.message || err);
+        if (err.message && err.message.includes("Mock") || err.message.includes("mock integration")) {
+            return res.status(502).json({ success: false, message: "External LIS Integration Failed. Operation rolled back." });
+        }
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };

@@ -22,6 +22,7 @@ import documentTemplateRoutes  from './routes/documentTemplate.route.js';
 import imagingOrderRoutes       from './routes/imagingOrder.route.js';
 import marRoutes                from './routes/mar.route.js';
 import medReconciliationRoutes  from './routes/medicationReconciliation.route.js';
+import auditLogRoutes           from './routes/auditLog.route.js';
 
 import errorHandler from "./middlewares/errorHandler.middleware.js";
 
@@ -60,6 +61,7 @@ app.use('/api/templates',                documentTemplateRoutes);
 app.use('/api/imaging-orders',           imagingOrderRoutes);
 app.use('/api/mar',                      marRoutes);
 app.use('/api/medication-reconciliation',medReconciliationRoutes);
+app.use('/api/audit-logs',               auditLogRoutes);
 
 // ── Error Handlers ─────────────────────────────────────────────────────────────
 app.use(errorHandler);

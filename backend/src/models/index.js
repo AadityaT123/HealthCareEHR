@@ -16,6 +16,9 @@ import ImagingOrder              from "./imagingOrder.model.js";
 import MAR                       from "./mar.model.js";
 import MedicationReconciliation  from "./medicationReconciliation.model.js";
 import AuditLog                  from "./auditLog.model.js";
+import PortalUser                from "./portalUser.model.js";
+import Message                   from "./message.model.js";
+import NotificationPreference    from "./notificationPreference.model.js";
 
 // Role → Users
 Role.hasMany(User,    { foreignKey: "roleId", onDelete: "RESTRICT" });
@@ -28,13 +31,16 @@ AuditLog.belongsTo(User,  { foreignKey: "userId" });
 // Patient associations
 Patient.hasMany(MedicalHistory, { foreignKey: "patientId", onDelete: "CASCADE" });
 Patient.hasMany(Appointment,    { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasMany(EncounterNote,  { foreignKey: "patientId", onDelete: "CASCADE" });
 Patient.hasMany(Prescription,   { foreignKey: "patientId", onDelete: "CASCADE" });
 Patient.hasMany(LabOrder,       { foreignKey: "patientId", onDelete: "CASCADE" });
-Patient.hasMany(EncounterNote,  { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasMany(ImagingOrder,   { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasMany(MAR,            { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasMany(MedicationReconciliation, { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasOne(PortalUser,      { foreignKey: "patientId", onDelete: "CASCADE" });
+Patient.hasMany(Message,        { foreignKey: "patientId", onDelete: "CASCADE" });
 
-MedicalHistory.belongsTo(Patient, { foreignKey: "patientId" });
-Appointment.belongsTo(Patient,    { foreignKey: "patientId" });
-Prescription.belongsTo(Patient,   { foreignKey: "patientId" });
+PortalUser.belongsTo(Patient, { foreignKey: "patientId" });
 LabOrder.belongsTo(Patient,       { foreignKey: "patientId" });
 EncounterNote.belongsTo(Patient,  { foreignKey: "patientId" });
 
@@ -110,6 +116,17 @@ MedicationReconciliation.belongsTo(User,       { foreignKey: "reconciledBy", as:
 EncounterNote.hasMany(MedicationReconciliation, { foreignKey: "encounterId", onDelete: "SET NULL" });
 MedicationReconciliation.belongsTo(EncounterNote, { foreignKey: "encounterId" });
 
+// Messages
+PortalUser.hasMany(Message, { foreignKey: "portalUserId", onDelete: "CASCADE" });
+User.hasMany(Message, { foreignKey: "staffUserId", onDelete: "SET NULL" });
+Message.belongsTo(Message, { foreignKey: "parentId", as: "parentMessage" });
+Message.belongsTo(PortalUser, { foreignKey: "portalUserId" });
+Message.belongsTo(User, { foreignKey: "staffUserId" });
+
+// Notification Preferences
+PortalUser.hasOne(NotificationPreference, { foreignKey: "portalUserId", onDelete: "CASCADE" });
+NotificationPreference.belongsTo(PortalUser, { foreignKey: "portalUserId" });
+
 export {
     Role, User, Patient, Doctor, Medication,
     MedicalHistory, Appointment, EncounterNote,
@@ -117,5 +134,6 @@ export {
     ProgressNote, DocumentTemplate,
     ImagingOrder, MAR, MedicationReconciliation,
     AuditLog,
+    PortalUser, Message, NotificationPreference,
     sequelize
 };

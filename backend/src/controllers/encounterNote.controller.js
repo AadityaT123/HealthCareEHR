@@ -1,5 +1,4 @@
 import { EncounterNote, Patient, Doctor, Appointment, sequelize } from "../models/index.js";
-import { logAction } from "../utils/auditLogger.js";
 
 // GET /api/encounters
 const getAllEncounterNotes = async (req, res) => {
@@ -7,15 +6,15 @@ const getAllEncounterNotes = async (req, res) => {
 
     try {
         const where = {};
-        if (patientId)     where.patientId     = patientId;
-        if (doctorId)      where.doctorId      = doctorId;
+        if (patientId) where.patientId = patientId;
+        if (doctorId) where.doctorId = doctorId;
         if (appointmentId) where.appointmentId = appointmentId;
 
         const notes = await EncounterNote.findAll({
             where,
             include: [
-                { model: Patient,     attributes: ["id", "firstName", "lastName"] },
-                { model: Doctor,      attributes: ["id", "firstName", "lastName", "specialization"] },
+                { model: Patient, attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] },
                 { model: Appointment, attributes: ["id", "appointmentDate", "appointmentType"] }
             ],
             order: [["encounterDate", "DESC"]]
@@ -32,8 +31,8 @@ const getEncounterNoteById = async (req, res) => {
     try {
         const note = await EncounterNote.findByPk(req.params.id, {
             include: [
-                { model: Patient,     attributes: ["id", "firstName", "lastName"] },
-                { model: Doctor,      attributes: ["id", "firstName", "lastName", "specialization"] },
+                { model: Patient, attributes: ["id", "firstName", "lastName"] },
+                { model: Doctor, attributes: ["id", "firstName", "lastName", "specialization"] },
                 { model: Appointment, attributes: ["id", "appointmentDate", "appointmentType"] }
             ]
         });
@@ -136,16 +135,6 @@ const createEncounterNoteHandler = async (req, res) => {
         await appointment.update({ status: "Completed" }, { transaction: t });
 
         await t.commit();
-
-        await logAction({
-            userId: req.user ? req.user.id : null,
-            action: "CREATE",
-            resource: "EncounterNote",
-            resourceId: note.id,
-            details: { diagnosis, appointmentId },
-            ipAddress: req.ip
-        });
-
         return res.status(201).json({ success: true, data: note });
     } catch (err) {
         await t.rollback();

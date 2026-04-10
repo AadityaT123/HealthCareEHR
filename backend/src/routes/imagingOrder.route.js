@@ -9,6 +9,8 @@ import {
     cancelImagingOrder
 } from "../controllers/imagingOrder.controller.js";
 import { protect, authorize } from "../middlewares/auth.middleware.js";
+import validate from "../middlewares/validate.middleware.js";
+import { createImagingOrderV, updateImagingOrderV } from "../validators/imagingOrder.validator.js";
 
 const router = express.Router();
 
@@ -28,10 +30,10 @@ router.get("/", getAllImagingOrders);
 router.get("/:id", getImagingOrderById);
 
 // POST /api/imaging-orders — create (Doctors and Admin only)
-router.post("/", authorize("Admin", "Doctor"), createImagingOrderHandler);
+router.post("/", authorize("Admin", "Doctor"), validate(createImagingOrderV), createImagingOrderHandler);
 
 // PUT /api/imaging-orders/:id — update (Doctors, Admin — blocked on terminal statuses)
-router.put("/:id", authorize("Admin", "Doctor"), updateImagingOrder);
+router.put("/:id", authorize("Admin", "Doctor"), validate(updateImagingOrderV), updateImagingOrder);
 
 // DELETE /api/imaging-orders/:id — soft cancel (Doctors and Admin)
 router.delete("/:id", authorize("Admin", "Doctor"), cancelImagingOrder);

@@ -12,6 +12,11 @@ const protect = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Security logic: prevent Patients from using their token on Staff routes
+        if (decoded.role === "Patient" || decoded.portalUserId)
+            return res.status(403).json({ success: false, message: "Portal tokens not accepted on staff routes" });
+
         req.user = decoded;
         next();
     } catch (err) {

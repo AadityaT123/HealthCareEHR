@@ -9,6 +9,8 @@ import {
     updateMAREntry
 } from "../controllers/mar.controller.js";
 import { protect, authorize } from "../middlewares/auth.middleware.js";
+import validate from "../middlewares/validate.middleware.js";
+import { createMarV } from "../validators/mar.validator.js";
 
 const router = express.Router();
 
@@ -31,7 +33,7 @@ router.get("/", getAllMAREntries);
 router.get("/:id", getMAREntryById);
 
 // POST /api/mar — record a dose administration (Doctors, Nurses, Pharmacists)
-router.post("/", authorize("Admin", "Doctor", "Nurse", "Pharmacist"), createMAREntry);
+router.post("/", authorize("Admin", "Doctor", "Nurse", "Pharmacist"), validate(createMarV), createMAREntry);
 
 // PUT /api/mar/:id — update a MAR entry (Doctors, Nurses, Admin)
 router.put("/:id", authorize("Admin", "Doctor", "Nurse"), updateMAREntry);

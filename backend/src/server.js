@@ -24,7 +24,18 @@ import marRoutes                from './routes/mar.route.js';
 import medReconciliationRoutes  from './routes/medicationReconciliation.route.js';
 import auditLogRoutes           from './routes/auditLog.route.js';
 
+// Portal Routes
+import authPortalRoutes          from "./routes/portal/auth.portal.route.js";
+import appointmentsPortalRoutes  from "./routes/portal/appointments.portal.route.js";
+import recordsPortalRoutes       from "./routes/portal/records.portal.route.js";
+import prescriptionsPortalRoutes from "./routes/portal/prescriptions.portal.route.js";
+import labResultsPortalRoutes    from "./routes/portal/labResults.portal.route.js";
+import messagesPortalRoutes      from "./routes/portal/messages.portal.route.js";
+import preferencesPortalRoutes   from "./routes/portal/preferences.portal.route.js";
+
 import errorHandler from "./middlewares/errorHandler.middleware.js";
+import { auditLogMiddleware } from "./middlewares/auditLog.middleware.js";
+import { authLimiter, portalLimiter } from "./middlewares/rateLimiter.middleware.js";
 
 const app = express();
 
@@ -32,6 +43,15 @@ app.use(helmet());
 app.use(cors({ origin: "*", credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json());
+
+// ── Rate Limiting (Security via 4.6) ───────────────────────────────────────────
+app.use("/portal", portalLimiter);          // Broad limiter on all portal routes
+app.use("/portal/auth/login", authLimiter); // Strict brute-force protection
+app.use("/portal/auth/register", authLimiter);
+app.use("/api/auth/login", authLimiter);    // Apply strict protection to staff login too
+
+// ── Global Audit Logger ────────────────────────────────────────────────────────
+app.use(auditLogMiddleware);
 
 // ── Health Check ───────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
@@ -62,6 +82,15 @@ app.use('/api/imaging-orders',           imagingOrderRoutes);
 app.use('/api/mar',                      marRoutes);
 app.use('/api/medication-reconciliation',medReconciliationRoutes);
 app.use('/api/audit-logs',               auditLogRoutes);
+
+// ── PORTAL ROUTES (Phase 4) ────────────────────────────────────────────────────
+app.use('/portal/auth',         authPortalRoutes);
+app.use('/portal/appointments', appointmentsPortalRoutes);
+app.use('/portal/records',      recordsPortalRoutes);
+app.use('/portal/prescriptions',prescriptionsPortalRoutes);
+app.use('/portal/lab-results',  labResultsPortalRoutes);
+app.use('/portal/messages',     messagesPortalRoutes);
+app.use('/portal/preferences',  preferencesPortalRoutes);
 
 // ── Error Handlers ─────────────────────────────────────────────────────────────
 app.use(errorHandler);

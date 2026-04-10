@@ -1,3 +1,4 @@
+import { sequelize } from "../config/database.js";
 import Role                      from "./role.model.js";
 import User                      from "./user.model.js";
 import Patient                   from "./patient.model.js";
@@ -109,5 +110,6 @@ export {
     MedicalHistory, Appointment, EncounterNote,
     Prescription, LabOrder, LabResult,
     ProgressNote, DocumentTemplate,
-    ImagingOrder, MAR, MedicationReconciliation
+    ImagingOrder, MAR, MedicationReconciliation,
+    sequelize
 };

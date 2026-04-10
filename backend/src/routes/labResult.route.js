@@ -9,6 +9,8 @@ import {
     deleteLabResult
 } from "../controllers/labResult.controller.js";
 import { protect, authorize } from "../middlewares/auth.middleware.js";
+import validate from "../middlewares/validate.middleware.js";
+import { createLabResultSchema, updateLabResultSchema } from "../validators/labResult.validator.js";
 
 const router = express.Router();
 
@@ -17,8 +19,8 @@ router.get("/critical",           protect, getCriticalLabResults);
 router.get("/order/:labOrderId",  protect, getLabResultsByOrderId);
 router.get("/",                   protect, getAllLabResults);
 router.get("/:id",                protect, getLabResultById);
-router.post("/",                  protect, authorize("Admin", "Lab Technician"),         createLabResultHandler);
-router.put("/:id",                protect, authorize("Admin", "Lab Technician"),         updateLabResult);
+router.post("/",                  protect, authorize("Admin", "Doctor", "Lab Technician"), validate(createLabResultSchema), createLabResultHandler);
+router.put("/:id",                protect, authorize("Admin", "Doctor", "Lab Technician"), validate(updateLabResultSchema), updateLabResult);
 router.delete("/:id",             protect, authorize("Admin"),                            deleteLabResult);
 
 export default router;

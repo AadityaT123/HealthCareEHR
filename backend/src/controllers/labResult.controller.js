@@ -1,4 +1,4 @@
-import { LabResult, LabOrder, Patient } from "../models/index.js";
+import { LabResult, LabOrder, Patient, sequelize } from "../models/index.js";
 import { sendCriticalResultAlert } from "../utils/notificationService.js";
 
 const VALID_STATUSES = ["Normal", "Abnormal", "Critical"];
@@ -74,29 +74,26 @@ const getCriticalLabResults = async (req, res) => {
 const createLabResultHandler = async (req, res) => {
     const { labOrderId, resultValue, resultDate, unit, referenceRange, status, notes } = req.body;
 
-    const missing = [];
-    if (!labOrderId)   missing.push("labOrderId");
-    if (!resultValue)  missing.push("resultValue");
-    if (!resultDate)   missing.push("resultDate");
-
-    if (missing.length > 0)
-        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
-
-    if (status && !VALID_STATUSES.includes(status))
-        return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+    const t = await sequelize.transaction();
 
     try {
         const labOrder = await LabOrder.findByPk(labOrderId);
-        if (!labOrder)
+        if (!labOrder) {
+            await t.rollback();
             return res.status(404).json({ success: false, message: "Lab order not found" });
+        }
 
-        if (labOrder.status === "Cancelled")
+        if (labOrder.status === "Cancelled") {
+            await t.rollback();
             return res.status(400).json({ success: false, message: "Cannot add result to a cancelled lab order" });
+        }
 
         // Prevent duplicate result for same lab order
         const exists = await LabResult.findOne({ where: { labOrderId } });
-        if (exists)
+        if (exists) {
+            await t.rollback();
             return res.status(409).json({ success: false, message: "A result already exists for this lab order" });
+        }
 
         const isCritical = status === "Critical";
 
@@ -105,10 +102,12 @@ const createLabResultHandler = async (req, res) => {
             referenceRange, notes,
             status: status || "Normal",
             isCritical
-        });
+        }, { transaction: t });
 
         // Auto-update lab order status to Completed
-        await labOrder.update({ status: "Completed" });
+        await labOrder.update({ status: "Completed" }, { transaction: t });
+
+        await t.commit();
 
         // Trigger critical result alert
         if (isCritical) sendCriticalResultAlert(labResult, labOrder);
@@ -119,6 +118,7 @@ const createLabResultHandler = async (req, res) => {
             ...(isCritical && { alert: "⚠️ Critical result — relevant staff have been notified" })
         });
     } catch (err) {
+        await t.rollback();
         console.error("createLabResult error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
@@ -147,18 +147,24 @@ const updateLabResult = async (req, res) => {
 
 // DELETE /api/lab-results/:id
 const deleteLabResult = async (req, res) => {
+    const t = await sequelize.transaction();
     try {
         const result = await LabResult.findByPk(req.params.id);
-        if (!result)
+        if (!result) {
+            await t.rollback();
             return res.status(404).json({ success: false, message: "Lab result not found" });
+        }
 
         // Revert lab order status to In Progress
         const labOrder = await LabOrder.findByPk(result.labOrderId);
-        if (labOrder) await labOrder.update({ status: "In Progress" });
+        if (labOrder) await labOrder.update({ status: "In Progress" }, { transaction: t });
 
-        await result.destroy();
+        await result.destroy({ transaction: t });
+        
+        await t.commit();
         return res.status(200).json({ success: true, message: "Lab result deleted successfully" });
     } catch (err) {
+        await t.rollback();
         console.error("deleteLabResult error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }

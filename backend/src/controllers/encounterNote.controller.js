@@ -1,4 +1,4 @@
-import { EncounterNote, Patient, Doctor, Appointment } from "../models/index.js";
+import { EncounterNote, Patient, Doctor, Appointment, sequelize } from "../models/index.js";
 
 // GET /api/encounters
 const getAllEncounterNotes = async (req, res) => {
@@ -88,52 +88,57 @@ const getEncounterNotesByDoctorId = async (req, res) => {
 const createEncounterNoteHandler = async (req, res) => {
     const { patientId, doctorId, appointmentId, encounterDate, chiefComplaint, diagnosis, treatmentPlan, notes } = req.body;
 
-    const missing = [];
-    if (!patientId)      missing.push("patientId");
-    if (!doctorId)       missing.push("doctorId");
-    if (!appointmentId)  missing.push("appointmentId");
-    if (!encounterDate)  missing.push("encounterDate");
-    if (!chiefComplaint) missing.push("chiefComplaint");
-    if (!diagnosis)      missing.push("diagnosis");
-    if (!treatmentPlan)  missing.push("treatmentPlan");
-
-    if (missing.length > 0)
-        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
+    const t = await sequelize.transaction();
 
     try {
         const patient = await Patient.findByPk(patientId);
-        if (!patient)
+        if (!patient) {
+            await t.rollback();
             return res.status(404).json({ success: false, message: "Patient not found" });
+        }
 
         const doctor = await Doctor.findByPk(doctorId);
-        if (!doctor)
+        if (!doctor) {
+            await t.rollback();
             return res.status(404).json({ success: false, message: "Doctor not found" });
+        }
 
         const appointment = await Appointment.findByPk(appointmentId);
-        if (!appointment)
+        if (!appointment) {
+            await t.rollback();
             return res.status(404).json({ success: false, message: "Appointment not found" });
+        }
 
-        if (appointment.patientId !== parseInt(patientId))
+        if (appointment.patientId !== parseInt(patientId)) {
+            await t.rollback();
             return res.status(400).json({ success: false, message: "Appointment does not belong to this patient" });
+        }
 
-        if (appointment.doctorId !== parseInt(doctorId))
+        if (appointment.doctorId !== parseInt(doctorId)) {
+            await t.rollback();
             return res.status(400).json({ success: false, message: "Appointment does not belong to this doctor" });
+        }
 
         // Prevent duplicate encounter note per appointment (unique constraint in DB)
         const exists = await EncounterNote.findOne({ where: { appointmentId } });
-        if (exists)
+        if (exists) {
+            await t.rollback();
             return res.status(409).json({ success: false, message: "An encounter note already exists for this appointment" });
+        }
 
         const note = await EncounterNote.create({
             patientId, doctorId, appointmentId, encounterDate,
             chiefComplaint, diagnosis, treatmentPlan, notes
-        });
+        }, { transaction: t });
 
         // Auto-complete appointment
-        await appointment.update({ status: "Completed" });
+        await appointment.update({ status: "Completed" }, { transaction: t });
+
+        await t.commit();
 
         return res.status(201).json({ success: true, data: note });
     } catch (err) {
+        await t.rollback();
         console.error("createEncounterNote error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }

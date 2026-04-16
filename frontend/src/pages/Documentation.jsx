@@ -1,276 +1,261 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { FileText, Plus, Stethoscope, ClipboardList, AlertCircle } from 'lucide-react';
+import { createEncounter, createProgressNote } from '../store/slices/clinicalSlice';
+import { fetchPatients } from '../store/slices/patientSlice';
+import { FileText, Plus, Search } from 'lucide-react';
+import {
+  PageHeader, Button, Card, CardBody, Modal, Input, Select, Textarea,
+  Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
+  Tabs, TabList, Tab, TabPanel, statusVariant,
+} from '../components/ui';
 import { format } from 'date-fns';
 
-import { fetchEncountersByPatient, createEncounter } from '../store/slices/clinicalSlice';
-import { fetchProgressNotesByPatient, createProgressNote } from '../store/slices/clinicalSlice';
-import { fetchPatients } from '../store/slices/patientSlice';
-import {
-  Card, CardHeader, CardBody, Button, Badge, Spinner,
-  EmptyState, Modal, Input, Select, Textarea, statusVariant
-} from '../components/ui';
+const ENCOUNTER_TYPES = ['Outpatient', 'Inpatient', 'Emergency', 'Telehealth', 'Follow-up'];
+const NOTE_TYPES = ['SOAP', 'Progress', 'Discharge', 'Consultation', 'Procedure'];
 
-// ── New Encounter Form ────────────────────────────────────────────────────────
-const EncounterForm = ({ patients, onSubmit, onClose }) => {
-  const [form, setForm] = useState({ patientId: '', reason: '', notes: '', encounterType: 'Outpatient' });
-  const [errors, setErrors] = useState({});
+const ENC_FORM  = { patientId: '', encounterType: '', chiefComplaint: '', diagnosis: '', plan: '', notes: '' };
+const NOTE_FORM = { patientId: '', encounterId: '', noteType: 'SOAP', subjective: '', objective: '', assessment: '', plan: '' };
 
-  const validate = () => {
-    const e = {};
-    if (!form.patientId) e.patientId = 'Patient is required';
-    if (!form.reason) e.reason = 'Reason is required';
-    return e;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const e2 = validate();
-    if (Object.keys(e2).length) { setErrors(e2); return; }
-    onSubmit(form);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Select label="Patient *" error={errors.patientId} value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
-        <option value="">Select a patient...</option>
-        {patients.map((p) => (
-          <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
-        ))}
-      </Select>
-      <Select label="Encounter Type" value={form.encounterType} onChange={(e) => setForm({ ...form, encounterType: e.target.value })}>
-        <option>Outpatient</option>
-        <option>Inpatient</option>
-        <option>Emergency</option>
-        <option>Telemedicine</option>
-      </Select>
-      <Input label="Chief Complaint / Reason *" placeholder="e.g. Follow-up visit, chest pain..." error={errors.reason} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-      <Textarea label="Clinical Notes" placeholder="Enter encounter notes, assessment..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit">Create Encounter</Button>
-      </div>
-    </form>
-  );
-};
-
-// ── New Progress Note Form ────────────────────────────────────────────────────
-const ProgressNoteForm = ({ patients, onSubmit, onClose }) => {
-  const [form, setForm] = useState({ patientId: '', noteType: 'SOAP', content: '', subjective: '', objective: '', assessment: '', plan: '' });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const e = {};
-    if (!form.patientId) e.patientId = 'Patient is required';
-    if (!form.content && !form.subjective) e.content = 'Note content is required';
-    return e;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const e2 = validate();
-    if (Object.keys(e2).length) { setErrors(e2); return; }
-    onSubmit(form);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Select label="Patient *" error={errors.patientId} value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
-        <option value="">Select a patient...</option>
-        {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
-      </Select>
-      <Select label="Note Type" value={form.noteType} onChange={(e) => setForm({ ...form, noteType: e.target.value })}>
-        <option value="SOAP">SOAP Note</option>
-        <option value="Narrative">Narrative</option>
-        <option value="Assessment">Assessment</option>
-        <option value="Treatment Plan">Treatment Plan</option>
-      </Select>
-      {form.noteType === 'SOAP' ? (
-        <div className="space-y-3">
-          <Input label="Subjective" placeholder="Patient's reported symptoms..." value={form.subjective} onChange={(e) => setForm({ ...form, subjective: e.target.value })} />
-          <Input label="Objective" placeholder="Clinical observations, vitals..." value={form.objective} onChange={(e) => setForm({ ...form, objective: e.target.value })} />
-          <Textarea label="Assessment" placeholder="Diagnosis and clinical impression..." value={form.assessment} onChange={(e) => setForm({ ...form, assessment: e.target.value })} />
-          <Textarea label="Plan" placeholder="Treatment plan, follow-up..." value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} />
-        </div>
-      ) : (
-        <Textarea label="Note Content *" placeholder="Enter clinical note..." rows={6} error={errors.content} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-      )}
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit">Save Note</Button>
-      </div>
-    </form>
-  );
-};
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 const Documentation = () => {
   const dispatch = useDispatch();
   const { encounters, progressNotes, loading, error } = useSelector((s) => s.clinical);
   const { list: patients } = useSelector((s) => s.patients);
 
-  const [activeTab, setActiveTab] = useState('encounters');
-  const [showEncounterModal, setShowEncounterModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [search,       setSearch]      = useState('');
+  const [encOpen,      setEncOpen]     = useState(false);
+  const [noteOpen,     setNoteOpen]    = useState(false);
+  const [encForm,      setEncForm]     = useState(ENC_FORM);
+  const [noteForm,     setNoteForm]    = useState(NOTE_FORM);
+  const [formErr,      setFormErr]     = useState('');
+  const [success,      setSuccess]     = useState('');
 
-  // Load all patients for the dropdowns
   useEffect(() => {
     dispatch(fetchPatients());
-    // Load all encounters (no specific patient filter at page level)
-    // We call with a dummy large limit so we see recent ones
+    // Load all encounters & notes via a broad fetch (no patient filter)
+    // The API supports GET /api/encounters and GET /api/progress-notes
+    dispatch({ type: 'clinical/fetchAllEncounters' }); // handled via direct thunk below
   }, [dispatch]);
 
-  const handleCreateEncounter = async (data) => {
-    await dispatch(createEncounter(data));
-    setShowEncounterModal(false);
-    // Refresh the patient's encounters
-    if (data.patientId) dispatch(fetchEncountersByPatient(data.patientId));
+  // Since clinicalSlice fetches by patient, we need to load globally
+  // We'll use the existing service directly via a custom effect
+  useEffect(() => {
+    import('../api/clinical.service.js').then(({ encounterService, progressNoteService }) => {
+      encounterService.getAll().then((res) => {
+        dispatch({ type: 'clinical/setAllEncounters', payload: res.data ?? res });
+      }).catch(() => {});
+      progressNoteService.getAll().then((res) => {
+        dispatch({ type: 'clinical/setAllProgressNotes', payload: res.data ?? res });
+      }).catch(() => {});
+    });
+  }, [dispatch]);
+
+  const getPatientName = (patientId) => {
+    const p = patients.find((pt) => pt.id === patientId || String(pt.id) === String(patientId));
+    return p ? `${p.firstName} ${p.lastName}` : `Patient #${patientId}`;
   };
 
-  const handleCreateNote = async (data) => {
-    await dispatch(createProgressNote(data));
-    setShowNoteModal(false);
-    if (data.patientId) dispatch(fetchProgressNotesByPatient(data.patientId));
+  const filterList = (list) =>
+    list.filter((item) => {
+      if (!search) return true;
+      const name = getPatientName(item.patientId).toLowerCase();
+      return name.includes(search.toLowerCase()) ||
+        (item.chiefComplaint || '').toLowerCase().includes(search.toLowerCase()) ||
+        (item.noteType || '').toLowerCase().includes(search.toLowerCase());
+    });
+
+  const handleEncSubmit = async (e) => {
+    e.preventDefault();
+    setFormErr('');
+    if (!encForm.patientId || !encForm.encounterType) {
+      setFormErr('Patient and encounter type are required.');
+      return;
+    }
+    const result = await dispatch(createEncounter(encForm));
+    if (createEncounter.fulfilled.match(result)) {
+      setSuccess('Encounter created.'); setEncOpen(false); setEncForm(ENC_FORM);
+      setTimeout(() => setSuccess(''), 4000);
+    } else { setFormErr(result.payload || 'Failed to create encounter.'); }
   };
 
-  const tabs = [
-    { key: 'encounters', label: 'Encounters', icon: Stethoscope },
-    { key: 'notes', label: 'Progress Notes', icon: ClipboardList },
-  ];
+  const handleNoteSubmit = async (e) => {
+    e.preventDefault();
+    setFormErr('');
+    if (!noteForm.patientId) { setFormErr('Patient is required.'); return; }
+    const result = await dispatch(createProgressNote(noteForm));
+    if (createProgressNote.fulfilled.match(result)) {
+      setSuccess('Progress note created.'); setNoteOpen(false); setNoteForm(NOTE_FORM);
+      setTimeout(() => setSuccess(''), 4000);
+    } else { setFormErr(result.payload || 'Failed to create note.'); }
+  };
+
+  const filteredEnc  = filterList(encounters);
+  const filteredNote = filterList(progressNotes);
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clinical Documentation</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Document encounters, assessments, treatment plans and progress notes.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowNoteModal(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Progress Note
-          </Button>
-          <Button onClick={() => setShowEncounterModal(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Encounter
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Documentation"
+        subtitle="Clinical encounters and progress notes"
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setNoteForm(NOTE_FORM); setFormErr(''); setNoteOpen(true); }}>
+              <Plus className="h-4 w-4" /> Progress Note
+            </Button>
+            <Button onClick={() => { setEncForm(ENC_FORM); setFormErr(''); setEncOpen(true); }}>
+              <Plus className="h-4 w-4" /> New Encounter
+            </Button>
+          </div>
+        }
+      />
 
-      {/* Tabs */}
-      <div className="border-b border-border">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
-                ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
+      {error   && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load records.'}</Alert>}
 
-      {/* Encounters Tab */}
-      {activeTab === 'encounters' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-foreground flex items-center gap-2">
-                <Stethoscope className="h-5 w-5 text-primary" /> Clinical Encounters
-              </h2>
-              <span className="text-sm text-muted-foreground">{encounters.length} records</span>
-            </div>
-          </CardHeader>
-          <CardBody className="p-0">
+      {/* Search */}
+      <Card>
+        <CardBody className="py-3">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by patient, complaint…"
+              className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          </div>
+        </CardBody>
+      </Card>
+
+      <Tabs defaultTab="encounters">
+        <TabList>
+          <Tab id="encounters">Encounters ({filteredEnc.length})</Tab>
+          <Tab id="notes">Progress Notes ({filteredNote.length})</Tab>
+        </TabList>
+
+        {/* Encounters */}
+        <TabPanel id="encounters">
+          <Card>
             {loading ? (
-              <div className="flex justify-center py-12"><Spinner /></div>
-            ) : error ? (
-              <div className="flex items-center gap-3 p-6 text-destructive">
-                <AlertCircle className="h-5 w-5" /> {error}
-              </div>
-            ) : encounters.length === 0 ? (
-              <EmptyState
-                icon={Stethoscope}
-                title="No encounters documented"
-                description="Start by creating a new clinical encounter for a patient."
-                action={<Button size="sm" onClick={() => setShowEncounterModal(true)}><Plus className="mr-2 h-4 w-4" />Create Encounter</Button>}
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/40 border-b border-border">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium">Date</th>
-                      <th className="px-6 py-3 text-left font-medium">Patient</th>
-                      <th className="px-6 py-3 text-left font-medium">Type</th>
-                      <th className="px-6 py-3 text-left font-medium">Reason</th>
-                      <th className="px-6 py-3 text-left font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {encounters.map((enc) => (
-                      <tr key={enc.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 text-muted-foreground">{enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}</td>
-                        <td className="px-6 py-3 font-medium text-foreground">{enc.Patient ? `${enc.Patient.firstName} ${enc.Patient.lastName}` : enc.patientId?.substring(0, 8)}</td>
-                        <td className="px-6 py-3"><Badge variant="info">{enc.encounterType || 'Outpatient'}</Badge></td>
-                        <td className="px-6 py-3 text-foreground">{enc.reason || enc.chiefComplaint || '—'}</td>
-                        <td className="px-6 py-3"><Badge variant={statusVariant(enc.status || 'Active')}>{enc.status || 'Active'}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Progress Notes Tab */}
-      {activeTab === 'notes' && (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center py-12"><Spinner /></div>
-          ) : progressNotes.length === 0 ? (
-            <Card>
+              <CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>
+            ) : filteredEnc.length === 0 ? (
               <CardBody>
-                <EmptyState
-                  icon={ClipboardList}
-                  title="No progress notes"
-                  description="Document a patient's clinical progress using SOAP or narrative notes."
-                  action={<Button size="sm" onClick={() => setShowNoteModal(true)}><Plus className="mr-2 h-4 w-4" />Add Note</Button>}
+                <EmptyState icon={FileText} title="No encounters found"
+                  description="Create the first clinical encounter."
+                  action={<Button onClick={() => setEncOpen(true)}><Plus className="h-4 w-4" />New Encounter</Button>}
                 />
               </CardBody>
-            </Card>
-          ) : (
-            progressNotes.map((note) => (
-              <Card key={note.id}>
-                <CardBody>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="info">{note.noteType || 'Note'}</Badge>
-                        <span className="text-xs text-muted-foreground">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy HH:mm') : '—'}</span>
-                      </div>
-                      <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                        {note.content || note.subjective || 'No content'}
-                      </p>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            ))
-          )}
-        </div>
-      )}
+            ) : (
+              <Table>
+                <Thead>
+                  <Tr><Th>Patient</Th><Th>Type</Th><Th>Chief Complaint</Th><Th>Diagnosis</Th><Th>Date</Th><Th>Status</Th></Tr>
+                </Thead>
+                <Tbody>
+                  {filteredEnc.map((enc) => (
+                    <Tr key={enc.id}>
+                      <Td><span className="font-medium">{getPatientName(enc.patientId)}</span></Td>
+                      <Td><Badge variant="info">{enc.encounterType || enc.type}</Badge></Td>
+                      <Td className="max-w-[200px] truncate text-muted-foreground">{enc.chiefComplaint || '—'}</Td>
+                      <Td className="max-w-[180px] truncate text-muted-foreground">{enc.diagnosis || '—'}</Td>
+                      <Td className="text-xs text-muted-foreground whitespace-nowrap">
+                        {enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}
+                      </Td>
+                      <Td><Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge></Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
+          </Card>
+        </TabPanel>
 
-      {/* Modals */}
-      <Modal open={showEncounterModal} onClose={() => setShowEncounterModal(false)} title="New Clinical Encounter">
-        <EncounterForm patients={patients} onSubmit={handleCreateEncounter} onClose={() => setShowEncounterModal(false)} />
+        {/* Progress Notes */}
+        <TabPanel id="notes">
+          <Card>
+            {loading ? (
+              <CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>
+            ) : filteredNote.length === 0 ? (
+              <CardBody>
+                <EmptyState icon={FileText} title="No progress notes"
+                  description="Create the first progress note."
+                  action={<Button onClick={() => setNoteOpen(true)}><Plus className="h-4 w-4" />New Note</Button>}
+                />
+              </CardBody>
+            ) : (
+              <Table>
+                <Thead>
+                  <Tr><Th>Patient</Th><Th>Type</Th><Th>Subjective</Th><Th>Assessment</Th><Th>Date</Th></Tr>
+                </Thead>
+                <Tbody>
+                  {filteredNote.map((note) => (
+                    <Tr key={note.id}>
+                      <Td><span className="font-medium">{getPatientName(note.patientId)}</span></Td>
+                      <Td><Badge variant="purple">{note.noteType || 'SOAP'}</Badge></Td>
+                      <Td className="max-w-[200px] truncate text-muted-foreground">{note.subjective || '—'}</Td>
+                      <Td className="max-w-[180px] truncate text-muted-foreground">{note.assessment || '—'}</Td>
+                      <Td className="text-xs text-muted-foreground whitespace-nowrap">
+                        {note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy') : '—'}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            )}
+          </Card>
+        </TabPanel>
+      </Tabs>
+
+      {/* New Encounter Modal */}
+      <Modal open={encOpen} onClose={() => setEncOpen(false)} title="New Encounter" size="md">
+        <form onSubmit={handleEncSubmit} className="space-y-4">
+          {formErr && <Alert variant="error">{formErr}</Alert>}
+          <Select label="Patient" required value={encForm.patientId}
+            onChange={(e) => setEncForm((f) => ({ ...f, patientId: e.target.value }))}>
+            <option value="">Select patient…</option>
+            {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+          </Select>
+          <Select label="Encounter Type" required value={encForm.encounterType}
+            onChange={(e) => setEncForm((f) => ({ ...f, encounterType: e.target.value }))}>
+            <option value="">Select type…</option>
+            {ENCOUNTER_TYPES.map((t) => <option key={t}>{t}</option>)}
+          </Select>
+          <Input label="Chief Complaint" placeholder="Why is the patient here?"
+            value={encForm.chiefComplaint} onChange={(e) => setEncForm((f) => ({ ...f, chiefComplaint: e.target.value }))} />
+          <Textarea label="Diagnosis" rows={2} placeholder="Diagnosis or differential…"
+            value={encForm.diagnosis} onChange={(e) => setEncForm((f) => ({ ...f, diagnosis: e.target.value }))} />
+          <Textarea label="Plan" rows={2} placeholder="Treatment plan…"
+            value={encForm.plan} onChange={(e) => setEncForm((f) => ({ ...f, plan: e.target.value }))} />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={() => setEncOpen(false)}>Cancel</Button>
+            <Button type="submit">Create Encounter</Button>
+          </div>
+        </form>
       </Modal>
-      <Modal open={showNoteModal} onClose={() => setShowNoteModal(false)} title="New Progress Note">
-        <ProgressNoteForm patients={patients} onSubmit={handleCreateNote} onClose={() => setShowNoteModal(false)} />
+
+      {/* New Progress Note Modal */}
+      <Modal open={noteOpen} onClose={() => setNoteOpen(false)} title="New Progress Note" size="lg">
+        <form onSubmit={handleNoteSubmit} className="space-y-4">
+          {formErr && <Alert variant="error">{formErr}</Alert>}
+          <div className="grid grid-cols-2 gap-4">
+            <Select label="Patient" required value={noteForm.patientId}
+              onChange={(e) => setNoteForm((f) => ({ ...f, patientId: e.target.value }))}>
+              <option value="">Select patient…</option>
+              {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+            </Select>
+            <Select label="Note Type" value={noteForm.noteType}
+              onChange={(e) => setNoteForm((f) => ({ ...f, noteType: e.target.value }))}>
+              {NOTE_TYPES.map((t) => <option key={t}>{t}</option>)}
+            </Select>
+          </div>
+          <Textarea label="Subjective" rows={2} placeholder="Patient's reported symptoms…"
+            value={noteForm.subjective} onChange={(e) => setNoteForm((f) => ({ ...f, subjective: e.target.value }))} />
+          <Textarea label="Objective" rows={2} placeholder="Examination findings, vitals…"
+            value={noteForm.objective} onChange={(e) => setNoteForm((f) => ({ ...f, objective: e.target.value }))} />
+          <Textarea label="Assessment" rows={2} placeholder="Clinical assessment…"
+            value={noteForm.assessment} onChange={(e) => setNoteForm((f) => ({ ...f, assessment: e.target.value }))} />
+          <Textarea label="Plan" rows={2} placeholder="Treatment plan…"
+            value={noteForm.plan} onChange={(e) => setNoteForm((f) => ({ ...f, plan: e.target.value }))} />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={() => setNoteOpen(false)}>Cancel</Button>
+            <Button type="submit">Save Note</Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

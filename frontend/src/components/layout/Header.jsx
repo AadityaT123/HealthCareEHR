@@ -65,8 +65,20 @@ const Header = () => {
         </button>
 
         {/* User avatar */}
-        <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-xs cursor-pointer hover:bg-primary/25 transition-colors">
-          {user?.username?.slice(0, 2).toUpperCase() || 'ST'}
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center text-primary font-semibold text-xs cursor-pointer hover:bg-primary/25 transition-colors">
+            {user?.username?.slice(0, 2).toUpperCase() || 'ST'}
+          </div>
+          <button 
+            onClick={() => {
+              // We'll dispatch logout from here as well.
+              // Note: we can use window.dispatchEvent to avoid Prop drilling or direct dispatch here if we import dispatch
+              window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+            }}
+            className="text-sm font-medium text-destructive hover:bg-destructive/10 px-3 py-1.5 rounded-md transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </div>
     </header>

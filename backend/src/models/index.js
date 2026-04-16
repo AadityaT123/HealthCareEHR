@@ -43,6 +43,8 @@ Patient.hasMany(Message,        { foreignKey: "patientId", onDelete: "CASCADE" }
 PortalUser.belongsTo(Patient, { foreignKey: "patientId" });
 LabOrder.belongsTo(Patient,       { foreignKey: "patientId" });
 EncounterNote.belongsTo(Patient,  { foreignKey: "patientId" });
+Appointment.belongsTo(Patient,    { foreignKey: "patientId" });
+Prescription.belongsTo(Patient,   { foreignKey: "patientId" });
 
 // Doctor associations
 Doctor.hasMany(Appointment,   { foreignKey: "doctorId", onDelete: "RESTRICT" });

@@ -19,7 +19,7 @@ const AuditLogs = () => {
   useEffect(() => {
     setLoading(true);
     auditLogService.getAll({ limit: 200 })
-      .then((res) => { setLogs(res.data ?? res ?? []); })
+      .then((res) => { setLogs(res.items || res.data || []); })
       .catch((err) => { setError(err.response?.data?.message || 'Failed to load audit logs. Admin role required.'); })
       .finally(() => setLoading(false));
   }, []);

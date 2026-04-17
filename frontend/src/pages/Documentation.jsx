@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createEncounter, createProgressNote } from '../store/slices/clinicalSlice';
+import {
+  createEncounter, createProgressNote,
+  setAllEncounters, setAllProgressNotes,
+} from '../store/slices/clinicalSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
+import { encounterService, progressNoteService } from '../api/clinical.service.js';
 import { FileText, Plus, Search } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Modal, Input, Select, Textarea,
@@ -16,9 +20,16 @@ const NOTE_TYPES = ['SOAP', 'Progress', 'Discharge', 'Consultation', 'Procedure'
 const ENC_FORM  = { patientId: '', encounterType: '', chiefComplaint: '', diagnosis: '', plan: '', notes: '' };
 const NOTE_FORM = { patientId: '', encounterId: '', noteType: 'SOAP', subjective: '', objective: '', assessment: '', plan: '' };
 
+// axiosClient unwraps response.data, so getAll() returns { success, data } directly.
+const toArray = (res) => {
+  if (Array.isArray(res))       return res;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
+};
+
 const Documentation = () => {
   const dispatch = useDispatch();
-  const { encounters, progressNotes, loading, error } = useSelector((s) => s.clinical);
+  const { allEncounters, allProgressNotes, loading, error } = useSelector((s) => s.clinical);
   const { list: patients } = useSelector((s) => s.patients);
 
   const [search,       setSearch]      = useState('');
@@ -31,22 +42,12 @@ const Documentation = () => {
 
   useEffect(() => {
     dispatch(fetchPatients());
-    // Load all encounters & notes via a broad fetch (no patient filter)
-    // The API supports GET /api/encounters and GET /api/progress-notes
-    dispatch({ type: 'clinical/fetchAllEncounters' }); // handled via direct thunk below
-  }, [dispatch]);
-
-  // Since clinicalSlice fetches by patient, we need to load globally
-  // We'll use the existing service directly via a custom effect
-  useEffect(() => {
-    import('../api/clinical.service.js').then(({ encounterService, progressNoteService }) => {
-      encounterService.getAll().then((res) => {
-        dispatch({ type: 'clinical/setAllEncounters', payload: res.data ?? res });
-      }).catch(() => {});
-      progressNoteService.getAll().then((res) => {
-        dispatch({ type: 'clinical/setAllProgressNotes', payload: res.data ?? res });
-      }).catch(() => {});
-    });
+    encounterService.getAll()
+      .then((res) => dispatch(setAllEncounters(toArray(res))))
+      .catch(() => {});
+    progressNoteService.getAll()
+      .then((res) => dispatch(setAllProgressNotes(toArray(res))))
+      .catch(() => {});
   }, [dispatch]);
 
   const getPatientName = (patientId) => {
@@ -54,14 +55,17 @@ const Documentation = () => {
     return p ? `${p.firstName} ${p.lastName}` : `Patient #${patientId}`;
   };
 
-  const filterList = (list) =>
-    list.filter((item) => {
-      if (!search) return true;
+
+  const filterList = (list) => {
+    if (!Array.isArray(list)) return [];
+    if (!search) return list;
+    return list.filter((item) => {
       const name = getPatientName(item.patientId).toLowerCase();
       return name.includes(search.toLowerCase()) ||
         (item.chiefComplaint || '').toLowerCase().includes(search.toLowerCase()) ||
         (item.noteType || '').toLowerCase().includes(search.toLowerCase());
     });
+  };
 
   const handleEncSubmit = async (e) => {
     e.preventDefault();
@@ -88,8 +92,8 @@ const Documentation = () => {
     } else { setFormErr(result.payload || 'Failed to create note.'); }
   };
 
-  const filteredEnc  = filterList(encounters);
-  const filteredNote = filterList(progressNotes);
+  const filteredEnc  = filterList(allEncounters);
+  const filteredNote = filterList(allProgressNotes);
 
   return (
     <div className="space-y-6 animate-fade-in">

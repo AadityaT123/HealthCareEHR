@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchLabOrdersByPatient, createLabOrder, fetchImagingOrdersByPatient, createImagingOrder, fetchLabResultsByPatient } from '../store/slices/ordersSlice';
+import {
+  createLabOrder, createImagingOrder,
+  setAllLabOrders, setAllImagingOrders, setAllLabResults,
+} from '../store/slices/ordersSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
+import { labOrderService, imagingOrderService, labResultService } from '../api/order.service.js';
 import { Activity, Plus, Search, FlaskConical, Scan } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Modal, Input, Select, Textarea,
@@ -17,9 +21,15 @@ const PRIORITIES = ['Routine', 'Urgent', 'STAT'];
 const LAB_FORM = { patientId: '', panelName: '', priority: 'Routine', clinicalIndication: '', notes: '' };
 const IMG_FORM = { patientId: '', imagingType: '', bodyPart: '', priority: 'Routine', clinicalIndication: '', notes: '' };
 
+const toArray = (res) => {
+  if (Array.isArray(res))        return res;
+  if (Array.isArray(res?.data))  return res.data;
+  return [];
+};
+
 const Orders = () => {
   const dispatch = useDispatch();
-  const { labOrders, imagingOrders, labResults, loading, error } = useSelector((s) => s.orders);
+  const { allLabOrders, allImagingOrders, allLabResults, loading, error } = useSelector((s) => s.orders);
   const { list: patients } = useSelector((s) => s.patients);
 
   const [search,   setSearch]  = useState('');
@@ -32,18 +42,15 @@ const Orders = () => {
 
   useEffect(() => {
     dispatch(fetchPatients());
-    // Load all orders globally via direct service call
-    import('../api/order.service.js').then(({ labOrderService, imagingOrderService, labResultService }) => {
-      labOrderService.getAll().then((res) => {
-        dispatch({ type: 'orders/setAllLabOrders', payload: res.data ?? res });
-      }).catch(() => {});
-      imagingOrderService.getAll().then((res) => {
-        dispatch({ type: 'orders/setAllImagingOrders', payload: res.data ?? res });
-      }).catch(() => {});
-      labResultService.getAll().then((res) => {
-        dispatch({ type: 'orders/setAllLabResults', payload: res.data ?? res });
-      }).catch(() => {});
-    });
+    labOrderService.getAll()
+      .then((res) => dispatch(setAllLabOrders(toArray(res))))
+      .catch(() => {});
+    imagingOrderService.getAll()
+      .then((res) => dispatch(setAllImagingOrders(toArray(res))))
+      .catch(() => {});
+    labResultService.getAll()
+      .then((res) => dispatch(setAllLabResults(toArray(res))))
+      .catch(() => {});
   }, [dispatch]);
 
   const getPatientName = (pid) => {
@@ -51,11 +58,14 @@ const Orders = () => {
     return p ? `${p.firstName} ${p.lastName}` : `Patient #${pid}`;
   };
 
-  const filterList = (list) => list.filter((item) => {
-    if (!search) return true;
-    return getPatientName(item.patientId).toLowerCase().includes(search.toLowerCase()) ||
-      (item.panelName || item.imagingType || item.testName || '').toLowerCase().includes(search.toLowerCase());
-  });
+  const filterList = (list) => {
+    if (!Array.isArray(list)) return [];
+    if (!search) return list;
+    return list.filter((item) =>
+      getPatientName(item.patientId).toLowerCase().includes(search.toLowerCase()) ||
+      (item.panelName || item.imagingType || item.testName || '').toLowerCase().includes(search.toLowerCase())
+    );
+  };
 
   const handleLabSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
@@ -77,9 +87,9 @@ const Orders = () => {
     } else { setFormErr(result.payload || 'Failed.'); }
   };
 
-  const fLab = filterList(labOrders);
-  const fImg = filterList(imagingOrders);
-  const fRes = filterList(labResults);
+  const fLab = filterList(allLabOrders);
+  const fImg = filterList(allImagingOrders);
+  const fRes = filterList(allLabResults);
 
   return (
     <div className="space-y-6 animate-fade-in">

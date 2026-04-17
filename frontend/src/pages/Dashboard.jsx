@@ -7,8 +7,16 @@ import {
 } from 'lucide-react';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchAppointments } from '../store/slices/appointmentSlice';
+import { setAllLabOrders, setAllImagingOrders } from '../store/slices/ordersSlice';
+import { labOrderService, imagingOrderService } from '../api/order.service.js';
 import { Card, CardBody, CardHeader, Spinner, Badge, statusVariant } from '../components/ui';
 import { format, isToday, parseISO } from 'date-fns';
+
+const toArray = (res) => {
+  if (Array.isArray(res))       return res;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
+};
 
 // ── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon: Icon, gradient, onClick, loading }) => (
@@ -54,10 +62,17 @@ const Dashboard = () => {
   const { user } = useSelector((s) => s.auth);
   const { list: patients, loading: pLoading } = useSelector((s) => s.patients);
   const { list: appointments, loading: aLoading } = useSelector((s) => s.appointments);
+  const { allLabOrders, allImagingOrders } = useSelector((s) => s.orders);
 
   useEffect(() => {
     dispatch(fetchPatients());
     dispatch(fetchAppointments());
+    labOrderService.getAll()
+      .then((res) => dispatch(setAllLabOrders(toArray(res))))
+      .catch(() => {});
+    imagingOrderService.getAll()
+      .then((res) => dispatch(setAllImagingOrders(toArray(res))))
+      .catch(() => {});
   }, [dispatch]);
 
   // Today's appointments
@@ -119,7 +134,7 @@ const Dashboard = () => {
           loading={aLoading}       onClick={() => navigate('/appointments')}
         />
         <StatCard
-          label="Lab & Imaging Orders" value="—" icon={FlaskConical}
+          label="Lab & Imaging Orders" value={allLabOrders.length + allImagingOrders.length} icon={FlaskConical}
           gradient="linear-gradient(135deg, #10b981, #059669)"
           onClick={() => navigate('/orders')}
         />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { loginUser } from '../store/slices/authSlice';
 import { Stethoscope, Eye, EyeOff, Loader2, ShieldCheck, Activity, Users } from 'lucide-react';
 
@@ -145,6 +145,9 @@ const Login = () => {
                 >
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+              </div>
+              <div className="flex justify-end mt-1">
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot password?</Link>
               </div>
             </div>
 

@@ -44,33 +44,44 @@ const getDoctorById = async (req, res) => {
 const createDoctorHandler = async (req, res) => {
     const { firstName, lastName, specialization, email, phone, licenseNumber } = req.body;
 
+    // Only the three core fields are truly required
     const missing = [];
     if (!firstName)      missing.push("firstName");
     if (!lastName)       missing.push("lastName");
     if (!specialization) missing.push("specialization");
-    if (!email)          missing.push("email");
-    if (!phone)          missing.push("phone");
-    if (!licenseNumber)  missing.push("licenseNumber");
 
     if (missing.length > 0)
-        return res.status(400).json({ success: false, message: `Missing fields: ${missing.join(", ")}` });
+        return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
 
     try {
-        const licenseDup = await Doctor.findOne({ where: { licenseNumber } });
-        if (licenseDup)
-            return res.status(409).json({ success: false, message: "A doctor with this license number already exists" });
+        // Duplicate checks only when values are actually provided
+        if (licenseNumber) {
+            const licenseDup = await Doctor.findOne({ where: { licenseNumber } });
+            if (licenseDup)
+                return res.status(409).json({ success: false, message: "A doctor with this license number already exists" });
+        }
 
-        const emailDup = await Doctor.findOne({ where: { email: { [Op.iLike]: email } } });
-        if (emailDup)
-            return res.status(409).json({ success: false, message: "A doctor with this email already exists" });
+        if (email) {
+            const emailDup = await Doctor.findOne({ where: { email: { [Op.iLike]: email } } });
+            if (emailDup)
+                return res.status(409).json({ success: false, message: "A doctor with this email already exists" });
+        }
 
-        const doctor = await Doctor.create({ firstName, lastName, specialization, email, phone, licenseNumber });
+        const doctor = await Doctor.create({
+            firstName,
+            lastName,
+            specialization,
+            email:         email         || null,
+            phone:         phone         || null,
+            licenseNumber: licenseNumber || null,
+        });
         return res.status(201).json({ success: true, data: doctor });
     } catch (err) {
         console.error("createDoctor error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
 
 // PUT /api/doctors/:id
 const updateDoctor = async (req, res) => {

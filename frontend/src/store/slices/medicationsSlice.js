@@ -7,8 +7,8 @@ export const fetchAllMedications = createAsyncThunk(
   async (params, { rejectWithValue }) => {
     try {
       const res = await medicationService.getAll(params);
-      // axiosClient unwraps response.data → res = { success, count, data: [...] }
-      return res.data ?? res;
+      // Backend returns paginated: { success, totalItems, items: [...], totalPages, currentPage }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch medications');
     }
@@ -33,7 +33,8 @@ export const fetchAllPrescriptions = createAsyncThunk(
   async (params, { rejectWithValue }) => {
     try {
       const res = await prescriptionService.getAll(params);
-      return res.data ?? res;
+      // Backend returns paginated: { success, totalItems, items: [...], totalPages, currentPage }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch all prescriptions');
     }

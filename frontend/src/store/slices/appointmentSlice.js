@@ -8,7 +8,8 @@ export const fetchAppointments = createAsyncThunk(
   async (params, { rejectWithValue }) => {
     try {
       const res = await appointmentService.getAll(params);
-      return res.data ?? res;
+      // Backend returns paginated: { success, totalItems, items: [...], totalPages, currentPage }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch appointments');
     }
@@ -20,7 +21,8 @@ export const fetchAppointmentsByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await appointmentService.getByPatient(patientId);
-      return res.data ?? res;
+      // Patient-scoped returns { success, data: [...] } (not paginated)
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch appointments');
     }

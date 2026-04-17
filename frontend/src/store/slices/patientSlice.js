@@ -9,7 +9,9 @@ export const fetchPatients = createAsyncThunk(
   async (params, { rejectWithValue }) => {
     try {
       const res = await patientService.getAllPatients(params);
-      return res.data ?? res; // backend: { success, data: [...] }
+      // Backend returns { success, totalItems, items: [...], totalPages, currentPage }
+      // axiosClient unwraps response.data so res IS that object
+      return res.items ?? res.data ?? res;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch patients');
     }

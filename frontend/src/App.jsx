@@ -5,7 +5,9 @@ import { logout } from './store/slices/authSlice';
 
 import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import PortalProtectedRoute from './components/PortalProtectedRoute';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
 
 // Staff Pages
 import Dashboard     from './pages/Dashboard';
@@ -18,6 +20,12 @@ import Appointments  from './pages/Appointments';
 import Doctors       from './pages/Doctors';
 import AuditLogs     from './pages/AuditLogs';
 import Settings      from './pages/Settings';
+
+// Patient Portal Pages
+import PatientPortalLogin     from './pages/portal/PatientPortalLogin';
+import PatientPortalRegister  from './pages/portal/PatientPortalRegister';
+import PatientDashboard       from './pages/portal/PatientDashboard';
+import PortalForgotPassword   from './pages/portal/PortalForgotPassword';
 
 function App() {
   const dispatch = useDispatch();
@@ -34,24 +42,37 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public */}
-        <Route path="/login" element={<Login />} />
+        {/* ── Staff Public Routes ──────────────────────────────────────────── */}
+        <Route path="/login"            element={<Login />} />
+        <Route path="/forgot-password"  element={<ForgotPassword />} />
 
-        {/* Staff Application — all protected */}
+        {/* ── Staff Application — all protected ───────────────────────────── */}
         <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-          <Route index              element={<Dashboard />} />
-          <Route path="patients"   element={<PatientsList />} />
-          <Route path="patients/:id" element={<PatientDetail />} />
-          <Route path="appointments" element={<Appointments />} />
-          <Route path="documentation" element={<Documentation />} />
-          <Route path="orders"     element={<Orders />} />
-          <Route path="medications" element={<Medications />} />
-          <Route path="doctors"    element={<Doctors />} />
-          <Route path="audit-logs" element={<AuditLogs />} />
-          <Route path="settings"   element={<Settings />} />
+          <Route index                 element={<Dashboard />} />
+          <Route path="patients"       element={<PatientsList />} />
+          <Route path="patients/:id"   element={<PatientDetail />} />
+          <Route path="appointments"   element={<Appointments />} />
+          <Route path="documentation"  element={<Documentation />} />
+          <Route path="orders"         element={<Orders />} />
+          <Route path="medications"    element={<Medications />} />
+          <Route path="doctors"        element={<Doctors />} />
+          <Route path="audit-logs"     element={<AuditLogs />} />
+          <Route path="settings"       element={<Settings />} />
           {/* Catch-all inside layout */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
+
+        {/* ── Patient Portal Public Routes ─────────────────────────────────── */}
+        <Route path="/portal/login"             element={<PatientPortalLogin />} />
+        <Route path="/portal/register"          element={<PatientPortalRegister />} />
+        <Route path="/portal/forgot-password"   element={<PortalForgotPassword />} />
+
+        {/* ── Patient Portal Protected Routes ─────────────────────────────── */}
+        <Route path="/portal/dashboard" element={
+          <PortalProtectedRoute><PatientDashboard /></PortalProtectedRoute>
+        } />
+        {/* Redirect /portal → /portal/login */}
+        <Route path="/portal" element={<Navigate to="/portal/login" replace />} />
 
         {/* Global catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

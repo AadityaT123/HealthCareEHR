@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchDoctors, createDoctor } from '../store/slices/doctorSlice';
-import { Stethoscope, Plus, Search, ToggleLeft } from 'lucide-react';
+import { fetchDoctors, createDoctor, createDoctorLogin } from '../store/slices/doctorSlice';
+import { Stethoscope, Plus, Search, KeyRound } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Modal, Input, Select, Textarea,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
 } from '../components/ui';
 
 const EMPTY_FORM = {
-  firstName: '', lastName: '', specialty: '', department: '',
+  firstName: '', lastName: '', specialization: '', department: '',
   phone: '', email: '', licenseNumber: '',
 };
 
@@ -23,11 +23,17 @@ const Doctors = () => {
   const dispatch = useDispatch();
   const { list: doctors, loading, saving, error } = useSelector((s) => s.doctors);
 
-  const [search,  setSearch]  = useState('');
-  const [addOpen, setAddOpen] = useState(false);
-  const [form,    setForm]    = useState(EMPTY_FORM);
-  const [formErr, setFormErr] = useState('');
-  const [success, setSuccess] = useState('');
+  const [search,      setSearch]      = useState('');
+  const [addOpen,     setAddOpen]     = useState(false);
+  const [form,        setForm]        = useState(EMPTY_FORM);
+  const [formErr,     setFormErr]     = useState('');
+  const [success,     setSuccess]     = useState('');
+  // Doctor login creation
+  const [loginOpen,   setLoginOpen]   = useState(false);
+  const [loginTarget, setLoginTarget] = useState(null); // { id, firstName, lastName }
+  const [loginForm,   setLoginForm]   = useState({ username: '', password: '' });
+  const [loginErr,    setLoginErr]    = useState('');
+  const [loginOk,     setLoginOk]     = useState('');
 
   useEffect(() => { dispatch(fetchDoctors()); }, [dispatch]);
 
@@ -39,7 +45,7 @@ const Doctors = () => {
   const handleAdd = async (e) => {
     e.preventDefault();
     setFormErr('');
-    if (!form.firstName || !form.lastName || !form.specialty) {
+    if (!form.firstName || !form.lastName || !form.specialization) {
       setFormErr('First name, last name and specialty are required.');
       return;
     }
@@ -51,6 +57,28 @@ const Doctors = () => {
       setTimeout(() => setSuccess(''), 4000);
     } else {
       setFormErr(result.payload || 'Failed to add doctor.');
+    }
+  };
+
+  const handleCreateLogin = async (e) => {
+    e.preventDefault();
+    setLoginErr('');
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      setLoginErr('Username and password are required.');
+      return;
+    }
+    if (loginForm.password.length < 8) {
+      setLoginErr('Password must be at least 8 characters.');
+      return;
+    }
+    const result = await dispatch(createDoctorLogin({ username: loginForm.username.trim(), password: loginForm.password }));
+    if (createDoctorLogin.fulfilled.match(result)) {
+      setLoginOk(`Login account created for Dr. ${loginTarget?.firstName} ${loginTarget?.lastName}. Username: ${loginForm.username}`);
+      setLoginOpen(false);
+      setLoginForm({ username: '', password: '' });
+      setTimeout(() => setLoginOk(''), 6000);
+    } else {
+      setLoginErr(result.payload || 'Failed to create login account.');
     }
   };
 
@@ -66,8 +94,9 @@ const Doctors = () => {
         }
       />
 
-      {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
-      {error   && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load doctors.'}</Alert>}
+      {success  && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
+      {loginOk  && <Alert variant="success" onClose={() => setLoginOk('')}>{loginOk}</Alert>}
+      {error    && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load doctors.'}</Alert>}
 
       {/* Search */}
       <Card>
@@ -104,6 +133,7 @@ const Doctors = () => {
                 <Th>License #</Th>
                 <Th>Contact</Th>
                 <Th>Status</Th>
+                <Th>Login</Th>
               </Tr>
             </Thead>
             <Tbody>
@@ -128,6 +158,20 @@ const Doctors = () => {
                       {d.isActive === false ? 'Inactive' : 'Active'}
                     </Badge>
                   </Td>
+                  <Td>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setLoginTarget(d);
+                        setLoginForm({ username: `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}`, password: '' });
+                        setLoginErr('');
+                        setLoginOpen(true);
+                      }}
+                    >
+                      <KeyRound className="h-3 w-3" /> Create Login
+                    </Button>
+                  </Td>
                 </Tr>
               ))}
             </Tbody>
@@ -147,8 +191,8 @@ const Doctors = () => {
               onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
           </div>
 
-          <Select label="Specialty" required value={form.specialty}
-            onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}>
+          <Select label="Specialty" required value={form.specialization}
+            onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}>
             <option value="">Select specialty…</option>
             {SPECIALTIES.map((s) => <option key={s}>{s}</option>)}
           </Select>
@@ -171,6 +215,36 @@ const Doctors = () => {
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add Doctor'}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Login Account Modal */}
+      <Modal open={loginOpen} onClose={() => setLoginOpen(false)} title="Create Login Account" size="sm">
+        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+          Creating a staff login for <strong>Dr. {loginTarget?.firstName} {loginTarget?.lastName}</strong>.
+          This account will have the <strong>Doctor</strong> role and can log in to the EHR system.
+        </div>
+        <form onSubmit={handleCreateLogin} className="space-y-4">
+          {loginErr && <Alert variant="error">{loginErr}</Alert>}
+          <Input
+            label="Username"
+            required
+            value={loginForm.username}
+            onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+            placeholder="e.g. dr.smith"
+          />
+          <Input
+            label="Password"
+            type="password"
+            required
+            value={loginForm.password}
+            onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+            placeholder="Min 8 characters"
+          />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={() => setLoginOpen(false)}>Cancel</Button>
+            <Button type="submit">Create Login</Button>
           </div>
         </form>
       </Modal>

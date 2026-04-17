@@ -6,6 +6,7 @@ import ordersReducer       from './slices/ordersSlice';
 import medicationsReducer  from './slices/medicationsSlice';
 import appointmentReducer  from './slices/appointmentSlice';
 import doctorReducer       from './slices/doctorSlice';
+import portalAuthReducer   from './slices/portalAuthSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,5 +17,6 @@ export const store = configureStore({
     medications:  medicationsReducer,
     appointments: appointmentReducer,
     doctors:      doctorReducer,
+    portalAuth:   portalAuthReducer,
   },
 });

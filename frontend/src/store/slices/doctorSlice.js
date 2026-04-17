@@ -8,7 +8,8 @@ export const fetchDoctors = createAsyncThunk(
   async (params, { rejectWithValue }) => {
     try {
       const res = await doctorService.getAll(params);
-      return res.data ?? res;
+      // Backend returns paginated: { success, totalItems, items: [...], totalPages, currentPage }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch doctors');
     }
@@ -47,6 +48,21 @@ export const updateDoctor = createAsyncThunk(
       return res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to update doctor');
+    }
+  }
+);
+
+// Creates a staff login account for a doctor — POST /api/auth/register
+// Doctor role is roleId=2 per the seeder order (Admin=1, Doctor=2, Nurse=3...)
+export const createDoctorLogin = createAsyncThunk(
+  'doctors/createLogin',
+  async ({ username, password }, { rejectWithValue }) => {
+    try {
+      const { default: axiosClient } = await import('../../api/axiosClient');
+      const res = await axiosClient.post('/auth/register', { username, password, roleId: 2 });
+      return res?.data ?? res;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to create login account');
     }
   }
 );

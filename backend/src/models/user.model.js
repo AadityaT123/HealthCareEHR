@@ -23,13 +23,22 @@ const User = sequelize.define("User", {
     isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
-    }
+    },
+    // ── Password Reset ─────────────────────────────────────────────────────────
+    resetToken: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    resetTokenExpiry: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
 }, {
     tableName: "users",
     timestamps: true,
     paranoid: true,
     defaultScope: {
-        attributes: { exclude: ["passwordHash"] }
+        attributes: { exclude: ["passwordHash", "resetToken", "resetTokenExpiry"] }
     }
 });
 

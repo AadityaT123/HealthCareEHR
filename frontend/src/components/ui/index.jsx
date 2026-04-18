@@ -16,18 +16,18 @@ export const Button = ({
 }) => {
   const base = 'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 select-none';
   const variants = {
-    primary:     'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm active:scale-[0.98]',
-    secondary:   'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    outline:     'border border-input bg-background hover:bg-muted hover:text-foreground',
-    ghost:       'hover:bg-muted hover:text-foreground',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm active:scale-[0.98]',
+    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+    outline: 'border border-input bg-background hover:bg-muted hover:text-foreground',
+    ghost: 'hover:bg-muted hover:text-foreground',
     destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-    success:     'bg-emerald-600 text-white hover:bg-emerald-700',
+    success: 'bg-emerald-600 text-white hover:bg-emerald-700',
   };
   const sizes = {
-    xs:   'h-7 px-2.5 text-xs',
-    sm:   'h-8 px-3 text-xs',
-    md:   'h-10 px-4 text-sm',
-    lg:   'h-11 px-6 text-base',
+    xs: 'h-7 px-2.5 text-xs',
+    sm: 'h-8 px-3 text-xs',
+    md: 'h-10 px-4 text-sm',
+    lg: 'h-11 px-6 text-base',
     icon: 'h-9 w-9',
   };
   return (
@@ -49,10 +49,10 @@ export const Badge = ({ children, variant = 'default', className = '' }) => {
     default: 'bg-primary/10 text-primary',
     success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
     warning: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    danger:  'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    muted:   'bg-muted text-muted-foreground',
-    info:    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    purple:  'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    danger: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    muted: 'bg-muted text-muted-foreground',
+    info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   };
   return (
     <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', variants[variant], className)}>
@@ -100,9 +100,9 @@ export const PageHeader = ({ title, subtitle, action, className = '' }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 const alertStyles = {
   success: { icon: CheckCircle2, cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300' },
-  error:   { icon: AlertCircle,  cls: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' },
+  error: { icon: AlertCircle, cls: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' },
   warning: { icon: AlertTriangle, cls: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300' },
-  info:    { icon: Info,          cls: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' },
+  info: { icon: Info, cls: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' },
 };
 export const Alert = ({ variant = 'info', title, children, onClose, className = '' }) => {
   const { icon: Icon, cls } = alertStyles[variant] || alertStyles.info;
@@ -159,20 +159,25 @@ export const Input = ({ label, error, hint, className = '', id, required, ...pro
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+        <label htmlFor={inputId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
           {label}{required && <span className="text-destructive ml-1">*</span>}
         </label>
       )}
       <input
         id={inputId}
         className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-          error && 'border-destructive focus-visible:ring-destructive',
+          'flex h-10 w-full rounded-md border border-slate-300 dark:border-slate-600',
+          'bg-white dark:bg-slate-800',
+          'px-3 py-2 text-sm text-slate-900 dark:text-slate-100',
+          'shadow-sm placeholder:text-slate-400 dark:placeholder:text-slate-500',
+          'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          error && 'border-destructive focus-visible:ring-destructive/40',
           className
         )}
         {...props}
       />
-      {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && !error && <p className="text-xs text-slate-500">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
@@ -186,14 +191,19 @@ export const Select = ({ label, error, children, className = '', id, required, .
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-foreground">
+        <label htmlFor={selectId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
           {label}{required && <span className="text-destructive ml-1">*</span>}
         </label>
       )}
       <select
         id={selectId}
         className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full rounded-md border border-slate-300 dark:border-slate-600',
+          'bg-white dark:bg-slate-800',
+          'px-3 py-2 text-sm text-slate-900 dark:text-slate-100',
+          'shadow-sm transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary',
+          'disabled:cursor-not-allowed disabled:opacity-50',
           error && 'border-destructive',
           className
         )}
@@ -241,22 +251,36 @@ export const Modal = ({ open, onClose, title, children, size = 'md' }) => {
   const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative bg-card border border-border rounded-xl shadow-2xl w-full max-h-[90vh] overflow-y-auto', sizes[size])}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card z-10">
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      {/* Solid dark scrim — no backdrop-blur so the content behind is fully hidden */}
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} />
+
+      {/* Modal panel — explicitly opaque white / dark backgrounds */}
+      <div className={cn(
+        'relative w-full max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl',
+        'bg-white dark:bg-[hsla(0, 0%, 100%, 1.00)]',
+        'border border-slate-200 dark:border-slate-700',
+        sizes[size]
+      )}>
+        {/* Header — prominent solid blue bar */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 bg-primary rounded-t-xl">
+          <h2 className="text-base font-semibold text-white tracking-wide">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-white/20 text-white/80 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+
+        {/* Body */}
+        <div className="p-6 bg-white dark:bg-[hsla(0, 0%, 100%, 1.00)]">
+          {children}
+        </div>
       </div>
     </div>
   );
 };
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Table

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchDoctors, createDoctor, createDoctorLogin } from '../store/slices/doctorSlice';
 import { Stethoscope, Plus, Search, KeyRound } from 'lucide-react';
 import {
-  PageHeader, Button, Card, CardBody, Modal, Input, Select, Textarea,
+  PageHeader, Button, Card, CardBody, Input, Select, Textarea,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
 } from '../components/ui';
 
@@ -38,7 +38,7 @@ const Doctors = () => {
   useEffect(() => { dispatch(fetchDoctors()); }, [dispatch]);
 
   const filtered = doctors.filter((d) => {
-    const name = `${d.firstName} ${d.lastName} ${d.specialty || ''}`.toLowerCase();
+    const name = `${d.firstName} ${d.lastName} ${d.specialization || ''}`.toLowerCase();
     return !search || name.includes(search.toLowerCase());
   });
 
@@ -88,7 +88,7 @@ const Doctors = () => {
         title="Doctors"
         subtitle={`${doctors.length} clinical staff members`}
         action={
-          <Button onClick={() => { setForm(EMPTY_FORM); setFormErr(''); setAddOpen(true); }}>
+          <Button onClick={() => { setForm(EMPTY_FORM); setFormErr(''); setLoginOpen(false); setAddOpen(true); setTimeout(() => document.getElementById("add-doctor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}>
             <Plus className="h-4 w-4" /> Add Doctor
           </Button>
         }
@@ -98,19 +98,103 @@ const Doctors = () => {
       {loginOk  && <Alert variant="success" onClose={() => setLoginOk('')}>{loginOk}</Alert>}
       {error    && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load doctors.'}</Alert>}
 
-      {/* Search */}
-      <Card>
-        <CardBody className="py-3">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or specialty…"
-              className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
+      {/* Relative wrapper for floating panels */}
+      <div className="relative">
+        
+        {/* Search */}
+        <Card>
+          <CardBody className="py-3">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or specialty…"
+                className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Click-away dimmer */}
+        {(addOpen || loginOpen) && (
+          <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setAddOpen(false); setLoginOpen(false); }} />
+        )}
+
+        {/* Floating Add Doctor Panel */}
+        {addOpen && (
+          <div id="add-doctor-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
+              <div className="flex items-center gap-2">
+                <Stethoscope className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white tracking-wide">Add New Doctor</h2>
+              </div>
+              <button onClick={() => setAddOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-6 py-4 bg-white">
+              <form onSubmit={handleAdd} className="space-y-4">
+                {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="First Name" required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
+                  <Input label="Last Name" required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
+                </div>
+
+                <Select label="Specialty" required value={form.specialization} onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}>
+                  <option value="">Select specialty…</option>
+                  {SPECIALTIES.map((s) => <option key={s}>{s}</option>)}
+                </Select>
+
+                <Input label="Department" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} placeholder="e.g. Cardiology Ward" />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Phone" type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                  <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                </div>
+
+                <Input label="License Number" value={form.licenseNumber} onChange={(e) => setForm((f) => ({ ...f, licenseNumber: e.target.value }))} placeholder="e.g. MD-123456" />
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
+                  <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add Doctor'}</Button>
+                </div>
+              </form>
+            </div>
           </div>
-        </CardBody>
-      </Card>
+        )}
+
+        {/* Floating Create Login Account Panel */}
+        {loginOpen && (
+          <div id="login-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#8b5cf6' }}>
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white tracking-wide">Create Login Account</h2>
+              </div>
+              <button onClick={() => setLoginOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-6 py-4 bg-white">
+              <div className="mb-4 rounded-lg bg-purple-50 border border-purple-200 px-4 py-3 text-sm text-purple-700">
+                Creating a staff login for <strong>Dr. {loginTarget?.firstName} {loginTarget?.lastName}</strong>.
+                This account will have the <strong>Doctor</strong> role and can log in to the EHR system.
+              </div>
+              <form onSubmit={handleCreateLogin} className="space-y-4">
+                {loginErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {loginErr}</div>}
+                
+                <Input label="Username" required value={loginForm.username} onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))} placeholder="e.g. dr.smith" />
+                <Input label="Password" type="password" required value={loginForm.password} onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" />
+                
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" type="button" onClick={() => setLoginOpen(false)}>Cancel</Button>
+                  <Button type="submit" style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none' }}>Create Login</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       {/* Table */}
       <Card>
@@ -149,7 +233,7 @@ const Doctors = () => {
                       </div>
                     </div>
                   </Td>
-                  <Td>{d.specialty || '—'}</Td>
+                  <Td>{d.specialization || '—'}</Td>
                   <Td className="text-muted-foreground">{d.department || '—'}</Td>
                   <Td><span className="font-mono text-xs">{d.licenseNumber || '—'}</span></Td>
                   <Td className="text-xs text-muted-foreground">{d.email || d.phone || '—'}</Td>
@@ -179,75 +263,7 @@ const Doctors = () => {
         )}
       </Card>
 
-      {/* Add Doctor Modal */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Doctor" size="md">
-        <form onSubmit={handleAdd} className="space-y-4">
-          {formErr && <Alert variant="error">{formErr}</Alert>}
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" required value={form.firstName}
-              onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
-            <Input label="Last Name" required value={form.lastName}
-              onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
-          </div>
-
-          <Select label="Specialty" required value={form.specialization}
-            onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}>
-            <option value="">Select specialty…</option>
-            {SPECIALTIES.map((s) => <option key={s}>{s}</option>)}
-          </Select>
-
-          <Input label="Department" value={form.department}
-            onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-            placeholder="e.g. Cardiology Ward" />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Phone" type="tel" value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-            <Input label="Email" type="email" value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-          </div>
-
-          <Input label="License Number" value={form.licenseNumber}
-            onChange={(e) => setForm((f) => ({ ...f, licenseNumber: e.target.value }))}
-            placeholder="e.g. MD-123456" />
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add Doctor'}</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Create Login Account Modal */}
-      <Modal open={loginOpen} onClose={() => setLoginOpen(false)} title="Create Login Account" size="sm">
-        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/20 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
-          Creating a staff login for <strong>Dr. {loginTarget?.firstName} {loginTarget?.lastName}</strong>.
-          This account will have the <strong>Doctor</strong> role and can log in to the EHR system.
-        </div>
-        <form onSubmit={handleCreateLogin} className="space-y-4">
-          {loginErr && <Alert variant="error">{loginErr}</Alert>}
-          <Input
-            label="Username"
-            required
-            value={loginForm.username}
-            onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
-            placeholder="e.g. dr.smith"
-          />
-          <Input
-            label="Password"
-            type="password"
-            required
-            value={loginForm.password}
-            onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-            placeholder="Min 8 characters"
-          />
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" type="button" onClick={() => setLoginOpen(false)}>Cancel</Button>
-            <Button type="submit">Create Login</Button>
-          </div>
-        </form>
-      </Modal>
+      </div>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchPatients, createPatient, deletePatient } from '../store/slices/patientSlice';
-import { Users, Search, Plus, Trash2, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Search, Plus, Trash2, ArrowRight, ChevronLeft, ChevronRight, X, UserPlus } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Modal,
   Input, Select, Table, Thead, Tbody, Tr, Th, Td,
@@ -58,6 +58,14 @@ const PatientsList = () => {
     });
   };
 
+  const openAdd = () => {
+    setForm(EMPTY_FORM);
+    setFormErr('');
+    setAddOpen(true);
+    // Scroll to the form panel smoothly
+    setTimeout(() => document.getElementById('add-patient-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     setFormErr('');
@@ -88,13 +96,13 @@ const PatientsList = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Patients"
         subtitle={`${patients.length} total registered patients`}
         action={
-          <Button onClick={() => { setForm(EMPTY_FORM); setFormErr(''); setAddOpen(true); }}>
-            <Plus className="h-4 w-4" /> Add Patient
+          <Button onClick={openAdd}>
+            <UserPlus className="h-4 w-4" /> Add Patient
           </Button>
         }
       />
@@ -102,7 +110,11 @@ const PatientsList = () => {
       {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
       {error   && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load patients.'}</Alert>}
 
-      {/* Filters */}
+
+      {/* ── Relative wrapper: search bar + floating form + table all share the same stacking context ── */}
+      <div className="relative">
+
+      {/* Search / Filter bar */}
       <Card>
         <CardBody className="py-3">
           <div className="flex flex-col sm:flex-row gap-3">
@@ -129,7 +141,144 @@ const PatientsList = () => {
         </CardBody>
       </Card>
 
-      {/* Table */}
+      {/* Transparent dimming layer — click to close without closing table */}
+      {addOpen && (
+        <div
+          className="absolute inset-0 z-20"
+          style={{ top: '56px' }}
+          onClick={() => setAddOpen(false)}
+        />
+      )}
+      {/* ── Floating Add Patient Panel — absolutely positioned, table never moves ── */}
+      {addOpen && (
+        <div
+          id="add-patient-panel"
+          className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+          style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}
+        >
+          {/* Panel header */}
+          <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
+            <div className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-white" />
+              <h2 className="text-sm font-semibold text-white tracking-wide">Add New Patient</h2>
+            </div>
+            <button
+              onClick={() => setAddOpen(false)}
+              className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Panel body */}
+          <div className="px-6 py-4 bg-white">
+            <form onSubmit={handleAdd} className="space-y-3">
+              {formErr && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  <span className="font-semibold">Error:</span> {formErr}
+                </div>
+              )}
+
+              {/* Row 1: Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">First Name <span className="text-red-500">*</span></label>
+                  <input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)}
+                    placeholder="e.g. John"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Last Name <span className="text-red-500">*</span></label>
+                  <input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)}
+                    placeholder="e.g. Doe"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+              </div>
+
+              {/* Row 2: DOB + Gender */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Date of Birth <span className="text-red-500">*</span></label>
+                  <input type="date" value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Gender <span className="text-red-500">*</span></label>
+                  <select value={form.gender} onChange={(e) => setField('gender', e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400">
+                    <option value="">Select gender…</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Phone + Email */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Phone</label>
+                  <input type="tel" value={form.contactInformation.phone} onChange={(e) => setField('contactInformation.phone', e.target.value)}
+                    placeholder="+1 (555) 000-0000"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Email</label>
+                  <input type="email" value={form.contactInformation.email} onChange={(e) => setField('contactInformation.email', e.target.value)}
+                    placeholder="patient@example.com"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+              </div>
+
+              {/* Row 4: Address */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">Address</label>
+                <input value={form.contactInformation.address} onChange={(e) => setField('contactInformation.address', e.target.value)}
+                  placeholder="Street, City, State, ZIP"
+                  className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+              </div>
+
+              {/* Row 5: Blood Type + Emergency Contact */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Blood Type</label>
+                  <select value={form.bloodType} onChange={(e) => setField('bloodType', e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400">
+                    <option value="">Unknown</option>
+                    {BLOOD_TYPES.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">Emergency Contact</label>
+                  <input value={form.emergencyContact} onChange={(e) => setField('emergencyContact', e.target.value)}
+                    placeholder="Name & phone"
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <p className="text-xs text-slate-400"><span className="text-red-500">*</span> Required</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setAddOpen(false)}
+                    className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={saving}
+                    className="h-8 px-5 rounded-md text-xs font-semibold text-white shadow-sm transition-colors disabled:opacity-60 disabled:pointer-events-none"
+                    style={{ backgroundColor: '#3b82f6' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
+                    {saving ? 'Saving…' : 'Add Patient'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Patient Table ── */}
       <Card>
         {loading ? (
           <CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>
@@ -140,7 +289,7 @@ const PatientsList = () => {
               title="No patients found"
               description={search ? 'Try adjusting your search or filter.' : 'Add your first patient to get started.'}
               action={!search && (
-                <Button onClick={() => setAddOpen(true)}>
+                <Button onClick={openAdd}>
                   <Plus className="h-4 w-4" /> Add Patient
                 </Button>
               )}
@@ -234,66 +383,9 @@ const PatientsList = () => {
         )}
       </Card>
 
-      {/* ── Add Patient Modal ── */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add New Patient" size="lg">
-        <form onSubmit={handleAdd} className="space-y-4">
-          {formErr && <Alert variant="error">{formErr}</Alert>}
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" required value={form.firstName}
-              onChange={(e) => setField('firstName', e.target.value)} placeholder="e.g. John" />
-            <Input label="Last Name" required value={form.lastName}
-              onChange={(e) => setField('lastName', e.target.value)} placeholder="e.g. Doe" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Date of Birth" required type="date" value={form.dateOfBirth}
-              onChange={(e) => setField('dateOfBirth', e.target.value)} />
-            <Select label="Gender" required value={form.gender}
-              onChange={(e) => setField('gender', e.target.value)}>
-              <option value="">Select gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Phone" type="tel" value={form.contactInformation.phone}
-              onChange={(e) => setField('contactInformation.phone', e.target.value)}
-              placeholder="+1 (555) 000-0000" />
-            <Input label="Email" type="email" value={form.contactInformation.email}
-              onChange={(e) => setField('contactInformation.email', e.target.value)}
-              placeholder="patient@example.com" />
-          </div>
-
-          <Input label="Address" value={form.contactInformation.address}
-            onChange={(e) => setField('contactInformation.address', e.target.value)}
-            placeholder="Street, City, State, ZIP" />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select label="Blood Type" value={form.bloodType}
-              onChange={(e) => setField('bloodType', e.target.value)}>
-              <option value="">Unknown</option>
-              {BLOOD_TYPES.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
-            </Select>
-            <Input label="Emergency Contact" value={form.emergencyContact}
-              onChange={(e) => setField('emergencyContact', e.target.value)}
-              placeholder="Name & phone" />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Add Patient'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* ── Delete Confirm Modal ── */}
+      {/* ── Delete Confirm Modal (kept as modal — small, infrequent, intentional) ── */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Patient" size="sm">
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="text-sm text-slate-600 mb-6">
           Are you sure you want to permanently delete this patient and all associated records? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
@@ -301,6 +393,15 @@ const PatientsList = () => {
           <Button variant="destructive" onClick={handleDelete}>Delete Permanently</Button>
         </div>
       </Modal>
+
+      </div> {/* end relative wrapper */}
+
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };

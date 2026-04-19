@@ -13,5 +13,5 @@ export const createLabOrderV = Joi.object({
 });
 
 export const updateLabOrderV = Joi.object({
-    status: Joi.string().valid("Pending", "Completed", "Cancelled").required()
+    status: Joi.string().valid("Pending", "In Progress", "Completed", "Cancelled").required()
 });

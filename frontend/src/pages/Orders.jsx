@@ -2,16 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createLabOrder, createImagingOrder,
-  setAllLabOrders, setAllImagingOrders, setAllLabResults,
+  updateLabOrder, deleteLabOrder,
+  updateImagingOrder, deleteImagingOrder,
+  setAllLabOrders, setAllImagingOrders,
 } from '../store/slices/ordersSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
-import { labOrderService, imagingOrderService, labResultService } from '../api/order.service.js';
+import { labOrderService, imagingOrderService } from '../api/order.service.js';
 import { Activity, Plus, Search, FlaskConical, Scan, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
-  Tabs, TabList, Tab, TabPanel, statusVariant,
+  Tabs, TabList, Tab, TabPanel, statusVariant, Modal,
 } from '../components/ui';
 import { format } from 'date-fns';
 
@@ -32,7 +34,7 @@ const LBL = "text-xs font-semibold text-slate-700";
 
 const Orders = () => {
   const dispatch = useDispatch();
-  const { allLabOrders, allImagingOrders, allLabResults, loading, error } = useSelector((s) => s.orders);
+  const { allLabOrders, allImagingOrders, loading, error } = useSelector((s) => s.orders);
   const { list: patients } = useSelector((s) => s.patients);
   const { list: doctors } = useSelector((s) => s.doctors);
 
@@ -43,15 +45,35 @@ const Orders = () => {
   const [imgOpen, setImgOpen] = useState(false);
   const [labForm, setLabForm] = useState(LAB_FORM);
   const [imgForm, setImgForm] = useState(IMG_FORM);
+  const [editOrder, setEditOrder] = useState(null);
+  const [editStatus, setEditStatus] = useState('');
   const [formErr, setFormErr] = useState('');
   const [success, setSuccess] = useState('');
+  const [deleteMsg, setDeleteMsg] = useState('');
+  const [uiError, setUiError] = useState('');
+
+  const getStatusStyle = (status) => {
+    const s = status?.toLowerCase() || '';
+    if (s === 'pending') return { color: '#eab308' }; // yellow
+    if (s === 'in progress' || s === 'ordered') return { color: '#3b82f6' }; // blue
+    if (s === 'completed') return { color: '#16a34a' }; // green
+    if (s === 'rejected' || s === 'cancelled') return { color: '#dc2626' }; // red
+    return {};
+  };
+
+  const getPriorityStyle = (priority) => {
+    const p = priority?.toLowerCase() || '';
+    if (p === 'stat') return { color: '#eab308' }; // yellow
+    if (p === 'urgent') return { color: '#dc2626' }; // red
+    if (p === 'routine') return { color: '#3b82f6' }; // blue
+    return {};
+  };
 
   useEffect(() => {
     dispatch(fetchPatients());
     dispatch(fetchDoctors());
     labOrderService.getAll({ limit: 1000 }).then((res) => dispatch(setAllLabOrders(toArray(res)))).catch(() => { });
     imagingOrderService.getAll({ limit: 1000 }).then((res) => dispatch(setAllImagingOrders(toArray(res)))).catch(() => { });
-    labResultService.getAll({ limit: 1000 }).then((res) => dispatch(setAllLabResults(toArray(res)))).catch(() => { });
   }, [dispatch]);
 
   const getPatientName = (pid) => { const p = patients.find((pt) => String(pt.id) === String(pid)); return p ? `${p.firstName} ${p.lastName}` : `Patient #${pid}`; };
@@ -112,9 +134,39 @@ const Orders = () => {
   const openLab = () => { setLabForm(LAB_FORM); setFormErr(''); setImgOpen(false); setLabOpen(true); };
   const openImg = () => { setImgForm(IMG_FORM); setFormErr(''); setLabOpen(false); setImgOpen(true); };
 
+  const openStatusEdit = (order, type) => {
+    setEditOrder({ ...order, type });
+    setEditStatus(order.status || (type === 'lab' ? 'Pending' : 'Ordered'));
+  };
+
+  const handleStatusUpdate = async () => {
+    if (!editOrder) return;
+    setUiError('');
+    const action = editOrder.type === 'lab'
+      ? updateLabOrder({ id: editOrder.id, data: { status: editStatus } })
+      : updateImagingOrder({ id: editOrder.id, data: { status: editStatus } });
+
+    const result = await dispatch(action);
+    if (result.error) {
+      setUiError(result.payload || 'Failed to update status');
+    }
+    setEditOrder(null);
+  };
+
+  const handleDelete = async (id, type) => {
+    setUiError('');
+    const action = type === 'lab' ? deleteLabOrder(id) : deleteImagingOrder(id);
+    const result = await dispatch(action);
+    if (result.error) {
+      setUiError(result.payload || 'Failed to delete order. It may be locked.');
+    } else {
+      setDeleteMsg('Order got deleted');
+      setTimeout(() => setDeleteMsg(''), 4000);
+    }
+  };
+
   const fLab = filterList(allLabOrders);
   const fImg = filterList(allImagingOrders);
-  const fRes = filterList(allLabResults);
 
   const labTotalPages = Math.max(1, Math.ceil(fLab.length / PAGE_SIZE));
   const imgTotalPages = Math.max(1, Math.ceil(fImg.length / PAGE_SIZE));
@@ -137,6 +189,8 @@ const Orders = () => {
 
       {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load orders.'}</Alert>}
+      {uiError && <Alert variant="error" className="!bg-white !text-red-600 shadow-sm font-semibold" onClose={() => setUiError('')}>{uiError}</Alert>}
+      {deleteMsg && <Alert variant="error" className="!bg-white !text-red-600 shadow-sm font-semibold" onClose={() => setDeleteMsg('')}>{deleteMsg}</Alert>}
 
       {/* Relative wrapper */}
       <div className="relative">
@@ -153,8 +207,62 @@ const Orders = () => {
         </Card>
 
         {/* Click-away dimmer */}
-        {(labOpen || imgOpen) && (
-          <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setLabOpen(false); setImgOpen(false); }} />
+        {(labOpen || imgOpen || !!editOrder) && (
+          <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setLabOpen(false); setImgOpen(false); setEditOrder(null); }} />
+        )}
+
+        {/* Edit Status Floating Panel */}
+        {editOrder && (
+          <div id="status-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '100px', animation: 'slideDown 0.18s ease-out' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white tracking-wide">Edit Status</h2>
+              </div>
+              <button onClick={() => setEditOrder(null)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-6 bg-white">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className={LBL}>Update Status</label>
+                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className={F}>
+                    {editOrder.type === 'lab' ? (
+                      <>
+                        <option value="Pending" style={{ color: '#eab308', fontWeight: 600 }}>Pending</option>
+                        <option value="In Progress" style={{ color: '#3b82f6', fontWeight: 600 }}>In Progress</option>
+                        <option value="Completed" style={{ color: '#16a34a', fontWeight: 600 }}>Completed</option>
+                        <option value="Cancelled" style={{ color: '#dc2626', fontWeight: 600 }}>Cancelled</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Ordered" style={{ color: '#3b82f6', fontWeight: 600 }}>Ordered</option>
+                        <option value="Completed" style={{ color: '#16a34a', fontWeight: 600 }}>Completed</option>
+                        <option value="Rejected" style={{ color: '#dc2626', fontWeight: 600 }}>Rejected</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+                  <button onClick={() => setEditOrder(null)}
+                    className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleStatusUpdate}
+                    className="h-8 px-5 rounded-md text-xs font-semibold text-white shadow-sm transition-colors bg-blue-500 hover:bg-blue-600">
+                    Save Update
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Lab Order Panel */}
@@ -312,7 +420,6 @@ const Orders = () => {
             <TabList>
               <Tab id="lab">Lab Orders ({fLab.length})</Tab>
               <Tab id="imaging">Imaging ({fImg.length})</Tab>
-              <Tab id="results">Lab Results ({fRes.length})</Tab>
             </TabList>
 
             <TabPanel id="lab">
@@ -322,16 +429,21 @@ const Orders = () => {
                     ? <CardBody><EmptyState icon={FlaskConical} title="No lab orders" description="Order the first lab test." action={<Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>} /></CardBody>
                     : <>
                       <Table>
-                        <Thead><Tr><Th>Patient</Th><Th>Panel / Test</Th><Th>Priority</Th><Th>Clinical Indication</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
+                        <Thead><Tr><Th>Patient</Th><Th>Panel / Test</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th><Th className="w-28">Actions</Th></Tr></Thead>
                         <Tbody>
                           {paginatedLab.map((o) => (
                             <Tr key={o.id}>
                               <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
                               <Td>{o.panelName || o.testName || '—'}</Td>
-                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
-                              <Td className="max-w-[180px] truncate text-muted-foreground">{o.clinicalIndication || '—'}</Td>
+                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'} className="!bg-white border" style={getPriorityStyle(o.priority)}>{o.priority || 'Routine'}</Badge></Td>
                               <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
-                              <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                              <Td><Badge variant={statusVariant(o.status)} className="!bg-white border" style={getStatusStyle(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                              <Td>
+                                <div className="flex gap-1">
+                                  <button onClick={() => openStatusEdit(o, 'lab')} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
+                                  <button onClick={() => handleDelete(o.id, 'lab')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                </div>
+                              </Td>
                             </Tr>
                           ))}
                         </Tbody>
@@ -371,16 +483,22 @@ const Orders = () => {
                     ? <CardBody><EmptyState icon={Scan} title="No imaging orders" description="Create an imaging request." action={<Button onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>} /></CardBody>
                     : <>
                       <Table>
-                        <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Body Part</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
+                        <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Body Part</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th><Th className="w-28">Actions</Th></Tr></Thead>
                         <Tbody>
                           {paginatedImg.map((o) => (
                             <Tr key={o.id}>
                               <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
                               <Td>{o.imagingType || '—'}</Td>
                               <Td className="text-muted-foreground">{o.bodyPart || '—'}</Td>
-                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
+                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'} className="!bg-white border" style={getPriorityStyle(o.priority)}>{o.priority || 'Routine'}</Badge></Td>
                               <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
-                              <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                              <Td><Badge variant={statusVariant(o.status)} className="!bg-white border" style={getStatusStyle(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                              <Td>
+                                <div className="flex gap-1">
+                                  <button onClick={() => openStatusEdit(o, 'img')} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
+                                  <button onClick={() => handleDelete(o.id, 'img')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                </div>
+                              </Td>
                             </Tr>
                           ))}
                         </Tbody>
@@ -413,28 +531,7 @@ const Orders = () => {
               </Card>
             </TabPanel>
 
-            <TabPanel id="results">
-              <Card>
-                {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
-                  : fRes.length === 0
-                    ? <CardBody><EmptyState icon={Activity} title="No lab results" description="Results will appear here once labs are processed." /></CardBody>
-                    : <Table>
-                      <Thead><Tr><Th>Patient</Th><Th>Test</Th><Th>Result</Th><Th>Reference Range</Th><Th>Date</Th><Th>Status</Th></Tr></Thead>
-                      <Tbody>
-                        {fRes.map((r) => (
-                          <Tr key={r.id}>
-                            <Td><span className="font-medium">{getPatientName(r.patientId)}</span></Td>
-                            <Td>{r.testName || '—'}</Td>
-                            <Td className="font-mono text-sm">{r.resultValue} {r.unit}</Td>
-                            <Td className="text-xs text-muted-foreground">{r.referenceRange || '—'}</Td>
-                            <Td className="text-xs text-muted-foreground whitespace-nowrap">{r.resultDate ? format(new Date(r.resultDate), 'MMM dd, yyyy') : '—'}</Td>
-                            <Td><Badge variant={statusVariant(r.status)}>{r.status || 'Resulted'}</Badge></Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>}
-              </Card>
-            </TabPanel>
+
           </Tabs>
         </div>
 

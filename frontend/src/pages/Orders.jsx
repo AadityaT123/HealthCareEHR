@@ -7,7 +7,7 @@ import {
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
 import { labOrderService, imagingOrderService, labResultService } from '../api/order.service.js';
-import { Activity, Plus, Search, FlaskConical, Scan, X } from 'lucide-react';
+import { Activity, Plus, Search, FlaskConical, Scan, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
@@ -22,7 +22,9 @@ const PRIORITIES = ['Routine', 'Urgent', 'STAT'];
 const LAB_FORM = { patientId: '', doctorId: '', panelName: '', priority: 'Routine', clinicalIndication: '', notes: '' };
 const IMG_FORM = { patientId: '', doctorId: '', imagingType: '', bodyPart: '', priority: 'Routine', clinicalIndication: '', notes: '' };
 
-const toArray = (res) => { if (Array.isArray(res)) return res; if (Array.isArray(res?.data)) return res.data; return []; };
+const PAGE_SIZE = 12;
+
+const toArray = (res) => { if (Array.isArray(res)) return res; if (Array.isArray(res?.data)) return res.data; if (Array.isArray(res?.items)) return res.items; return []; };
 
 const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
 const FTA = "flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none";
@@ -32,9 +34,11 @@ const Orders = () => {
   const dispatch = useDispatch();
   const { allLabOrders, allImagingOrders, allLabResults, loading, error } = useSelector((s) => s.orders);
   const { list: patients } = useSelector((s) => s.patients);
-  const { list: doctors }  = useSelector((s) => s.doctors);
+  const { list: doctors } = useSelector((s) => s.doctors);
 
   const [search, setSearch] = useState('');
+  const [labPage, setLabPage] = useState(1);
+  const [imgPage, setImgPage] = useState(1);
   const [labOpen, setLabOpen] = useState(false);
   const [imgOpen, setImgOpen] = useState(false);
   const [labForm, setLabForm] = useState(LAB_FORM);
@@ -45,9 +49,9 @@ const Orders = () => {
   useEffect(() => {
     dispatch(fetchPatients());
     dispatch(fetchDoctors());
-    labOrderService.getAll().then((res) => dispatch(setAllLabOrders(toArray(res)))).catch(() => { });
-    imagingOrderService.getAll().then((res) => dispatch(setAllImagingOrders(toArray(res)))).catch(() => { });
-    labResultService.getAll().then((res) => dispatch(setAllLabResults(toArray(res)))).catch(() => { });
+    labOrderService.getAll({ limit: 1000 }).then((res) => dispatch(setAllLabOrders(toArray(res)))).catch(() => { });
+    imagingOrderService.getAll({ limit: 1000 }).then((res) => dispatch(setAllImagingOrders(toArray(res)))).catch(() => { });
+    labResultService.getAll({ limit: 1000 }).then((res) => dispatch(setAllLabResults(toArray(res)))).catch(() => { });
   }, [dispatch]);
 
   const getPatientName = (pid) => { const p = patients.find((pt) => String(pt.id) === String(pid)); return p ? `${p.firstName} ${p.lastName}` : `Patient #${pid}`; };
@@ -63,15 +67,18 @@ const Orders = () => {
   const handleLabSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
     if (!labForm.patientId) { setFormErr('Patient is required.'); return; }
-    if (!labForm.doctorId)  { setFormErr('Doctor is required.'); return; }
+    if (!labForm.doctorId) { setFormErr('Doctor is required.'); return; }
     if (!labForm.panelName) { setFormErr('Test panel is required.'); return; }
+    const isUrine = labForm.panelName.toLowerCase().includes('urin');
+    const backendTestType = isUrine ? 'Urine Test' : 'Blood Test';
     const payload = {
-      patientId:          Number(labForm.patientId),
-      doctorId:           Number(labForm.doctorId),
-      panelName:          labForm.panelName,
-      testType:           labForm.panelName,   // backend alias
-      orderDate:          new Date().toISOString(),
-      priority:           labForm.priority || 'Routine',
+      patientId: Number(labForm.patientId),
+      doctorId: Number(labForm.doctorId),
+      panelName: labForm.panelName,
+      testName: labForm.panelName,
+      testType: backendTestType,
+      orderDate: new Date().toISOString(),
+      priority: labForm.priority || 'Routine',
       clinicalIndication: labForm.clinicalIndication || '',
     };
     const result = await dispatch(createLabOrder(payload));
@@ -83,17 +90,17 @@ const Orders = () => {
 
   const handleImgSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
-    if (!imgForm.patientId)    { setFormErr('Patient is required.'); return; }
-    if (!imgForm.doctorId)     { setFormErr('Doctor is required.'); return; }
-    if (!imgForm.imagingType)  { setFormErr('Imaging type is required.'); return; }
+    if (!imgForm.patientId) { setFormErr('Patient is required.'); return; }
+    if (!imgForm.doctorId) { setFormErr('Doctor is required.'); return; }
+    if (!imgForm.imagingType) { setFormErr('Imaging type is required.'); return; }
     const payload = {
-      patientId:          Number(imgForm.patientId),
-      doctorId:           Number(imgForm.doctorId),
-      imagingType:        imgForm.imagingType,
-      bodyPart:           imgForm.bodyPart || 'Not specified',
-      priority:           imgForm.priority || 'Routine',
+      patientId: Number(imgForm.patientId),
+      doctorId: Number(imgForm.doctorId),
+      imagingType: imgForm.imagingType,
+      bodyPart: imgForm.bodyPart || 'Not specified',
+      priority: imgForm.priority || 'Routine',
       clinicalIndication: imgForm.clinicalIndication || '',
-      clinicalReason:     imgForm.clinicalIndication || '',  // backend alias
+      clinicalReason: imgForm.clinicalIndication || '',  // backend alias
     };
     const result = await dispatch(createImagingOrder(payload));
     if (createImagingOrder.fulfilled.match(result)) {
@@ -109,11 +116,17 @@ const Orders = () => {
   const fImg = filterList(allImagingOrders);
   const fRes = filterList(allLabResults);
 
+  const labTotalPages = Math.max(1, Math.ceil(fLab.length / PAGE_SIZE));
+  const imgTotalPages = Math.max(1, Math.ceil(fImg.length / PAGE_SIZE));
+
+  const paginatedLab = fLab.slice((labPage - 1) * PAGE_SIZE, labPage * PAGE_SIZE);
+  const paginatedImg = fImg.slice((imgPage - 1) * PAGE_SIZE, imgPage * PAGE_SIZE);
+
   return (
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Orders"
-        subtitle="Lab orders, imaging requests, and results"
+        subtitle="Lab orders and imaging requests"
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>
@@ -133,7 +146,7 @@ const Orders = () => {
           <CardBody className="py-3">
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search orders…"
+              <input value={search} onChange={(e) => { setSearch(e.target.value); setLabPage(1); setImgPage(1); }} placeholder="Search orders…"
                 className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
             </div>
           </CardBody>
@@ -307,21 +320,47 @@ const Orders = () => {
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : fLab.length === 0
                     ? <CardBody><EmptyState icon={FlaskConical} title="No lab orders" description="Order the first lab test." action={<Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>} /></CardBody>
-                    : <Table>
-                      <Thead><Tr><Th>Patient</Th><Th>Panel / Test</Th><Th>Priority</Th><Th>Clinical Indication</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
-                      <Tbody>
-                        {fLab.map((o) => (
-                          <Tr key={o.id}>
-                            <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
-                            <Td>{o.panelName || o.testName || '—'}</Td>
-                            <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
-                            <Td className="max-w-[180px] truncate text-muted-foreground">{o.clinicalIndication || '—'}</Td>
-                            <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
-                            <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>}
+                    : <>
+                      <Table>
+                        <Thead><Tr><Th>Patient</Th><Th>Panel / Test</Th><Th>Priority</Th><Th>Clinical Indication</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
+                        <Tbody>
+                          {paginatedLab.map((o) => (
+                            <Tr key={o.id}>
+                              <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
+                              <Td>{o.panelName || o.testName || '—'}</Td>
+                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
+                              <Td className="max-w-[180px] truncate text-muted-foreground">{o.clinicalIndication || '—'}</Td>
+                              <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
+                              <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                      {labTotalPages > 1 && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {(labPage - 1) * PAGE_SIZE + 1}–{Math.min(labPage * PAGE_SIZE, fLab.length)} of {fLab.length}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setLabPage((p) => Math.max(1, p - 1))}
+                              disabled={labPage === 1}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="text-sm text-foreground px-2">{labPage} / {labTotalPages}</span>
+                            <button
+                              onClick={() => setLabPage((p) => Math.min(labTotalPages, p + 1))}
+                              disabled={labPage === labTotalPages}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>}
               </Card>
             </TabPanel>
 
@@ -330,21 +369,47 @@ const Orders = () => {
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : fImg.length === 0
                     ? <CardBody><EmptyState icon={Scan} title="No imaging orders" description="Create an imaging request." action={<Button onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>} /></CardBody>
-                    : <Table>
-                      <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Body Part</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
-                      <Tbody>
-                        {fImg.map((o) => (
-                          <Tr key={o.id}>
-                            <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
-                            <Td>{o.imagingType || '—'}</Td>
-                            <Td className="text-muted-foreground">{o.bodyPart || '—'}</Td>
-                            <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
-                            <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
-                            <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>}
+                    : <>
+                      <Table>
+                        <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Body Part</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th></Tr></Thead>
+                        <Tbody>
+                          {paginatedImg.map((o) => (
+                            <Tr key={o.id}>
+                              <Td><span className="font-medium">{getPatientName(o.patientId)}</span></Td>
+                              <Td>{o.imagingType || '—'}</Td>
+                              <Td className="text-muted-foreground">{o.bodyPart || '—'}</Td>
+                              <Td><Badge variant={o.priority === 'STAT' ? 'danger' : o.priority === 'Urgent' ? 'warning' : 'muted'}>{o.priority || 'Routine'}</Badge></Td>
+                              <Td className="text-xs text-muted-foreground whitespace-nowrap">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</Td>
+                              <Td><Badge variant={statusVariant(o.status)}>{o.status || 'Ordered'}</Badge></Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                      {imgTotalPages > 1 && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {(imgPage - 1) * PAGE_SIZE + 1}–{Math.min(imgPage * PAGE_SIZE, fImg.length)} of {fImg.length}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setImgPage((p) => Math.max(1, p - 1))}
+                              disabled={imgPage === 1}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="text-sm text-foreground px-2">{imgPage} / {imgTotalPages}</span>
+                            <button
+                              onClick={() => setImgPage((p) => Math.min(imgTotalPages, p + 1))}
+                              disabled={imgPage === imgTotalPages}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>}
               </Card>
             </TabPanel>
 

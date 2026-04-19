@@ -99,7 +99,7 @@ export const PageHeader = ({ title, subtitle, action, className = '' }) => (
 // Alert
 // ─────────────────────────────────────────────────────────────────────────────
 const alertStyles = {
-  success: { icon: CheckCircle2, cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300' },
+  success: { icon: CheckCircle2, cls: 'bg-white border-emerald-500 text-emerald-600 shadow-sm' },
   error: { icon: AlertCircle, cls: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' },
   warning: { icon: AlertTriangle, cls: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300' },
   info: { icon: Info, cls: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' },

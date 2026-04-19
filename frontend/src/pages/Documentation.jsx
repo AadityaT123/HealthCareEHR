@@ -1,277 +1,406 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { FileText, Plus, Stethoscope, ClipboardList, AlertCircle } from 'lucide-react';
+import {
+  createEncounter, createProgressNote,
+  setAllEncounters, setAllProgressNotes,
+} from '../store/slices/clinicalSlice';
+import { fetchPatients } from '../store/slices/patientSlice';
+import { fetchDoctors } from '../store/slices/doctorSlice';
+import { fetchAppointments } from '../store/slices/appointmentSlice';
+import { encounterService, progressNoteService } from '../api/clinical.service.js';
+import { FileText, Plus, Search, X, Stethoscope, ClipboardList } from 'lucide-react';
+import {
+  PageHeader, Button, Card, CardBody,
+  Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
+  Tabs, TabList, Tab, TabPanel, statusVariant,
+} from '../components/ui';
 import { format } from 'date-fns';
 
-import { fetchEncountersByPatient, createEncounter } from '../store/slices/clinicalSlice';
-import { fetchProgressNotesByPatient, createProgressNote } from '../store/slices/clinicalSlice';
-import { fetchPatients } from '../store/slices/patientSlice';
-import {
-  Card, CardHeader, CardBody, Button, Badge, Spinner,
-  EmptyState, Modal, Input, Select, Textarea, statusVariant
-} from '../components/ui';
-
-// ── New Encounter Form ────────────────────────────────────────────────────────
-const EncounterForm = ({ patients, onSubmit, onClose }) => {
-  const [form, setForm] = useState({ patientId: '', reason: '', notes: '', encounterType: 'Outpatient' });
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const e = {};
-    if (!form.patientId) e.patientId = 'Patient is required';
-    if (!form.reason) e.reason = 'Reason is required';
-    return e;
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const e2 = validate();
-    if (Object.keys(e2).length) { setErrors(e2); return; }
-    onSubmit(form);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Select label="Patient *" error={errors.patientId} value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
-        <option value="">Select a patient...</option>
-        {patients.map((p) => (
-          <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
-        ))}
-      </Select>
-      <Select label="Encounter Type" value={form.encounterType} onChange={(e) => setForm({ ...form, encounterType: e.target.value })}>
-        <option>Outpatient</option>
-        <option>Inpatient</option>
-        <option>Emergency</option>
-        <option>Telemedicine</option>
-      </Select>
-      <Input label="Chief Complaint / Reason *" placeholder="e.g. Follow-up visit, chest pain..." error={errors.reason} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-      <Textarea label="Clinical Notes" placeholder="Enter encounter notes, assessment..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit">Create Encounter</Button>
-      </div>
-    </form>
-  );
+// Encounter form: backend requires patientId, doctorId, appointmentId, encounterDate, chiefComplaint, diagnosis, treatmentPlan
+const ENC_FORM = {
+  patientId: '', doctorId: '', appointmentId: '',
+  encounterDate: new Date().toISOString().split('T')[0],
+  chiefComplaint: '', diagnosis: '', treatmentPlan: '', notes: ''
+};
+// Progress Note form: backend requires patientId, doctorId, noteDate, assessment, plan
+// Field names: subjectiveFindings, objectiveFindings (not subjective/objective)
+const NOTE_FORM = {
+  patientId: '', doctorId: '',
+  noteDate: new Date().toISOString().split('T')[0],
+  noteType: 'SOAP',
+  subjectiveFindings: '', objectiveFindings: '', assessment: '', plan: ''
 };
 
-// ── New Progress Note Form ────────────────────────────────────────────────────
-const ProgressNoteForm = ({ patients, onSubmit, onClose }) => {
-  const [form, setForm] = useState({ patientId: '', noteType: 'SOAP', content: '', subjective: '', objective: '', assessment: '', plan: '' });
-  const [errors, setErrors] = useState({});
+const toArray = (res) => { if (Array.isArray(res)) return res; if (Array.isArray(res?.data)) return res.data; return []; };
 
-  const validate = () => {
-    const e = {};
-    if (!form.patientId) e.patientId = 'Patient is required';
-    if (!form.content && !form.subjective) e.content = 'Note content is required';
-    return e;
-  };
+const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
+const FTA = "flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none";
+const LBL = "text-xs font-semibold text-slate-700";
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const e2 = validate();
-    if (Object.keys(e2).length) { setErrors(e2); return; }
-    onSubmit(form);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Select label="Patient *" error={errors.patientId} value={form.patientId} onChange={(e) => setForm({ ...form, patientId: e.target.value })}>
-        <option value="">Select a patient...</option>
-        {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
-      </Select>
-      <Select label="Note Type" value={form.noteType} onChange={(e) => setForm({ ...form, noteType: e.target.value })}>
-        <option value="SOAP">SOAP Note</option>
-        <option value="Narrative">Narrative</option>
-        <option value="Assessment">Assessment</option>
-        <option value="Treatment Plan">Treatment Plan</option>
-      </Select>
-      {form.noteType === 'SOAP' ? (
-        <div className="space-y-3">
-          <Input label="Subjective" placeholder="Patient's reported symptoms..." value={form.subjective} onChange={(e) => setForm({ ...form, subjective: e.target.value })} />
-          <Input label="Objective" placeholder="Clinical observations, vitals..." value={form.objective} onChange={(e) => setForm({ ...form, objective: e.target.value })} />
-          <Textarea label="Assessment" placeholder="Diagnosis and clinical impression..." value={form.assessment} onChange={(e) => setForm({ ...form, assessment: e.target.value })} />
-          <Textarea label="Plan" placeholder="Treatment plan, follow-up..." value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} />
-        </div>
-      ) : (
-        <Textarea label="Note Content *" placeholder="Enter clinical note..." rows={6} error={errors.content} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
-      )}
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit">Save Note</Button>
-      </div>
-    </form>
-  );
-};
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 const Documentation = () => {
   const dispatch = useDispatch();
-  const { encounters, progressNotes, loading, error } = useSelector((s) => s.clinical);
+  const { allEncounters, allProgressNotes, loading, error } = useSelector((s) => s.clinical);
   const { list: patients } = useSelector((s) => s.patients);
+  const { list: doctors }  = useSelector((s) => s.doctors);
+  const { list: appointments } = useSelector((s) => s.appointments);
+  // Get the logged-in doctor's ID (if the user is a doctor)
+  const authUser = useSelector((s) => s.auth?.user);
+  const loggedDoctorId = authUser?.doctorId || authUser?.id ? String(authUser.doctorId || '') : '';
 
-  const [activeTab, setActiveTab] = useState('encounters');
-  const [showEncounterModal, setShowEncounterModal] = useState(false);
-  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [encOpen, setEncOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [encForm, setEncForm] = useState(ENC_FORM);
+  const [noteForm, setNoteForm] = useState(NOTE_FORM);
+  const [formErr, setFormErr] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Load all patients for the dropdowns
   useEffect(() => {
     dispatch(fetchPatients());
-    // Load all encounters (no specific patient filter at page level)
-    // We call with a dummy large limit so we see recent ones
+    dispatch(fetchDoctors());
+    dispatch(fetchAppointments());
+    encounterService.getAll().then((res) => dispatch(setAllEncounters(toArray(res)))).catch(() => { });
+    progressNoteService.getAll().then((res) => dispatch(setAllProgressNotes(toArray(res)))).catch(() => { });
   }, [dispatch]);
 
-  const handleCreateEncounter = async (data) => {
-    await dispatch(createEncounter(data));
-    setShowEncounterModal(false);
-    // Refresh the patient's encounters
-    if (data.patientId) dispatch(fetchEncountersByPatient(data.patientId));
+  const getPatientName = (patientId) => {
+    const p = patients.find((pt) => pt.id === patientId || String(pt.id) === String(patientId));
+    return p ? `${p.firstName} ${p.lastName}` : `Patient #${patientId}`;
   };
 
-  const handleCreateNote = async (data) => {
-    await dispatch(createProgressNote(data));
-    setShowNoteModal(false);
-    if (data.patientId) dispatch(fetchProgressNotesByPatient(data.patientId));
+  const filterList = (list) => {
+    if (!Array.isArray(list)) return [];
+    if (!search) return list;
+    return list.filter((item) => {
+      const name = getPatientName(item.patientId).toLowerCase();
+      return name.includes(search.toLowerCase()) ||
+        (item.chiefComplaint || '').toLowerCase().includes(search.toLowerCase()) ||
+        (item.noteType || '').toLowerCase().includes(search.toLowerCase());
+    });
   };
 
-  const tabs = [
-    { key: 'encounters', label: 'Encounters', icon: Stethoscope },
-    { key: 'notes', label: 'Progress Notes', icon: ClipboardList },
-  ];
+  const handleEncSubmit = async (e) => {
+    e.preventDefault(); setFormErr('');
+    if (!encForm.patientId)   { setFormErr('Patient is required.'); return; }
+    if (!encForm.doctorId)    { setFormErr('Doctor is required.'); return; }
+    if (!encForm.appointmentId) { setFormErr('Appointment is required (encounters must be linked to an appointment).'); return; }
+    if (!encForm.chiefComplaint) { setFormErr('Chief complaint is required.'); return; }
+    const payload = {
+      patientId:      Number(encForm.patientId),
+      doctorId:       Number(encForm.doctorId),
+      appointmentId:  Number(encForm.appointmentId),
+      encounterDate:  encForm.encounterDate || new Date().toISOString(),
+      chiefComplaint: encForm.chiefComplaint,
+      diagnosis:      encForm.diagnosis || 'Pending',
+      treatmentPlan:  encForm.treatmentPlan || 'To be determined',
+      notes:          encForm.notes || '',
+    };
+    const result = await dispatch(createEncounter(payload));
+    if (createEncounter.fulfilled.match(result)) {
+      setSuccess('Encounter created.'); setEncOpen(false); setEncForm(ENC_FORM);
+      setTimeout(() => setSuccess(''), 4000);
+    } else { setFormErr(result.payload || 'Failed to create encounter.'); }
+  };
+
+  const handleNoteSubmit = async (e) => {
+    e.preventDefault(); setFormErr('');
+    if (!noteForm.patientId)  { setFormErr('Patient is required.'); return; }
+    if (!noteForm.doctorId)   { setFormErr('Doctor is required.'); return; }
+    if (!noteForm.assessment) { setFormErr('Assessment is required.'); return; }
+    if (!noteForm.plan)       { setFormErr('Plan is required.'); return; }
+    const payload = {
+      patientId:          Number(noteForm.patientId),
+      doctorId:           Number(noteForm.doctorId),
+      noteDate:           noteForm.noteDate || new Date().toISOString().split('T')[0],
+      noteType:           noteForm.noteType || 'SOAP',
+      subjectiveFindings: noteForm.subjectiveFindings || '',
+      objectiveFindings:  noteForm.objectiveFindings  || '',
+      assessment:         noteForm.assessment,
+      plan:               noteForm.plan,
+    };
+    const result = await dispatch(createProgressNote(payload));
+    if (createProgressNote.fulfilled.match(result)) {
+      setSuccess('Progress note created.'); setNoteOpen(false); setNoteForm(NOTE_FORM);
+      setTimeout(() => setSuccess(''), 4000);
+    } else { setFormErr(result.payload || 'Failed to create note.'); }
+  };
+
+  const openEnc = () => { setEncForm(ENC_FORM); setFormErr(''); setNoteOpen(false); setEncOpen(true); };
+  const openNote = () => { setNoteForm(NOTE_FORM); setFormErr(''); setEncOpen(false); setNoteOpen(true); };
+
+  const filteredEnc = filterList(allEncounters);
+  const filteredNote = filterList(allProgressNotes);
+
+  // Panel component shared between both forms
+  const FloatingPanel = ({ id, open, onClose, icon: Icon, title, color = '#3b82f6', children }) => {
+    if (!open) return null;
+    return (
+      <div id={id}
+        className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+        style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+        <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: color }}>
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-white" />
+            <h2 className="text-sm font-semibold text-white tracking-wide">{title}</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="px-6 py-4 bg-white">{children}</div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Clinical Documentation</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Document encounters, assessments, treatment plans and progress notes.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowNoteModal(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Progress Note
-          </Button>
-          <Button onClick={() => setShowEncounterModal(true)}>
-            <Plus className="mr-2 h-4 w-4" /> New Encounter
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4 animate-fade-in">
+      <PageHeader
+        title="Documentation"
+        subtitle="Clinical encounters and progress notes"
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={openNote}><Plus className="h-4 w-4" /> Progress Note</Button>
+            <Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>
+          </div>
+        }
+      />
 
-      {/* Tabs */}
-      <div className="border-b border-border">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
-                ${activeTab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
+      {error && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load records.'}</Alert>}
 
-      {/* Encounters Tab */}
-      {activeTab === 'encounters' && (
+      {/* Relative wrapper */}
+      <div className="relative">
+
+        {/* Search bar */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-foreground flex items-center gap-2">
-                <Stethoscope className="h-5 w-5 text-primary" /> Clinical Encounters
-              </h2>
-              <span className="text-sm text-muted-foreground">{encounters.length} records</span>
+          <CardBody className="py-3">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by patient, complaint…"
+                className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
             </div>
-          </CardHeader>
-          <CardBody className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-12"><Spinner /></div>
-            ) : error ? (
-              <div className="flex items-center gap-3 p-6 text-destructive">
-                <AlertCircle className="h-5 w-5" /> {error}
-              </div>
-            ) : encounters.length === 0 ? (
-              <EmptyState
-                icon={Stethoscope}
-                title="No encounters documented"
-                description="Start by creating a new clinical encounter for a patient."
-                action={<Button size="sm" onClick={() => setShowEncounterModal(true)}><Plus className="mr-2 h-4 w-4" />Create Encounter</Button>}
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground uppercase bg-muted/40 border-b border-border">
-                    <tr>
-                      <th className="px-6 py-3 text-left font-medium">Date</th>
-                      <th className="px-6 py-3 text-left font-medium">Patient</th>
-                      <th className="px-6 py-3 text-left font-medium">Type</th>
-                      <th className="px-6 py-3 text-left font-medium">Reason</th>
-                      <th className="px-6 py-3 text-left font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {encounters.map((enc) => (
-                      <tr key={enc.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-3 text-muted-foreground">{enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}</td>
-                        <td className="px-6 py-3 font-medium text-foreground">{enc.Patient ? `${enc.Patient.firstName} ${enc.Patient.lastName}` : enc.patientId?.substring(0, 8)}</td>
-                        <td className="px-6 py-3"><Badge variant="info">{enc.encounterType || 'Outpatient'}</Badge></td>
-                        <td className="px-6 py-3 text-foreground">{enc.reason || enc.chiefComplaint || '—'}</td>
-                        <td className="px-6 py-3"><Badge variant={statusVariant(enc.status || 'Active')}>{enc.status || 'Active'}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </CardBody>
         </Card>
-      )}
 
-      {/* Progress Notes Tab */}
-      {activeTab === 'notes' && (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex justify-center py-12"><Spinner /></div>
-          ) : progressNotes.length === 0 ? (
-            <Card>
-              <CardBody>
-                <EmptyState
-                  icon={ClipboardList}
-                  title="No progress notes"
-                  description="Document a patient's clinical progress using SOAP or narrative notes."
-                  action={<Button size="sm" onClick={() => setShowNoteModal(true)}><Plus className="mr-2 h-4 w-4" />Add Note</Button>}
-                />
-              </CardBody>
-            </Card>
-          ) : (
-            progressNotes.map((note) => (
-              <Card key={note.id}>
-                <CardBody>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="info">{note.noteType || 'Note'}</Badge>
-                        <span className="text-xs text-muted-foreground">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy HH:mm') : '—'}</span>
-                      </div>
-                      <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                        {note.content || note.subjective || 'No content'}
-                      </p>
-                    </div>
-                  </div>
-                </CardBody>
+        {/* Click-away dimmer */}
+        {(encOpen || noteOpen) && (
+          <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setEncOpen(false); setNoteOpen(false); }} />
+        )}
+
+        {/* New Encounter Panel */}
+        <FloatingPanel id="enc-panel" open={encOpen} onClose={() => setEncOpen(false)} icon={Stethoscope} title="New Encounter">
+          <form onSubmit={handleEncSubmit} className="space-y-3">
+            {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Patient <span className="text-red-500">*</span></label>
+                <select value={encForm.patientId} onChange={(e) => setEncForm((f) => ({ ...f, patientId: e.target.value }))} className={F}>
+                  <option value="">Select patient…</option>
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Doctor <span className="text-red-500">*</span></label>
+                <select value={encForm.doctorId} onChange={(e) => setEncForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
+                  <option value="">Select doctor…</option>
+                  {doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Linked Appointment <span className="text-red-500">*</span></label>
+                <select value={encForm.appointmentId} onChange={(e) => setEncForm((f) => ({ ...f, appointmentId: e.target.value }))} className={F}>
+                  <option value="">Select appointment…</option>
+                  {appointments.filter(a => !encForm.patientId || String(a.patientId) === String(encForm.patientId)).map((a) => {
+                    const pat = patients.find(p => String(p.id) === String(a.patientId));
+                    const label = `#${a.id} – ${pat ? pat.firstName + ' ' + pat.lastName : ''} (${a.appointmentType || ''}, ${a.status || ''})`;
+                    return <option key={a.id} value={a.id}>{label}</option>;
+                  })}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Encounter Date</label>
+                <input type="date" value={encForm.encounterDate} onChange={(e) => setEncForm((f) => ({ ...f, encounterDate: e.target.value }))} className={F} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className={LBL}>Chief Complaint <span className="text-red-500">*</span></label>
+              <input value={encForm.chiefComplaint} onChange={(e) => setEncForm((f) => ({ ...f, chiefComplaint: e.target.value }))} placeholder="Why is the patient here?" className={F} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Diagnosis</label>
+                <textarea rows={2} value={encForm.diagnosis} onChange={(e) => setEncForm((f) => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis or differential…" className={FTA} />
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Treatment Plan</label>
+                <textarea rows={2} value={encForm.treatmentPlan} onChange={(e) => setEncForm((f) => ({ ...f, treatmentPlan: e.target.value }))} placeholder="Treatment plan…" className={FTA} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-400"><span className="text-red-500">*</span> Required</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEncOpen(false)} className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button type="submit"
+                  className="h-8 px-5 rounded-md text-xs font-semibold text-white shadow-sm transition-colors"
+                  style={{ backgroundColor: '#3b82f6' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
+                  Create Encounter
+                </button>
+              </div>
+            </div>
+          </form>
+        </FloatingPanel>
+
+        {/* New Progress Note Panel */}
+        <FloatingPanel id="note-panel" open={noteOpen} onClose={() => setNoteOpen(false)} icon={ClipboardList} title="New Progress Note" color="#3b82f6">
+          <form onSubmit={handleNoteSubmit} className="space-y-3">
+            {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+
+            {/* Row 1: Patient + Doctor */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Patient <span className="text-red-500">*</span></label>
+                <select value={noteForm.patientId} onChange={(e) => setNoteForm((f) => ({ ...f, patientId: e.target.value }))} className={F}>
+                  <option value="">Select patient…</option>
+                  {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Doctor <span className="text-red-500">*</span></label>
+                <select value={noteForm.doctorId} onChange={(e) => setNoteForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
+                  <option value="">Select doctor…</option>
+                  {doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 2: Note Type + Date */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Note Type</label>
+                <select value={noteForm.noteType} onChange={(e) => setNoteForm((f) => ({ ...f, noteType: e.target.value }))} className={F}>
+                  <option value="SOAP">SOAP</option>
+                  <option value="Narrative">Narrative</option>
+                  <option value="Problem-Oriented">Problem-Oriented</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Note Date</label>
+                <input type="date" value={noteForm.noteDate} onChange={(e) => setNoteForm((f) => ({ ...f, noteDate: e.target.value }))} className={F} />
+              </div>
+            </div>
+
+            {/* Row 3: Subjective + Objective */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Subjective</label>
+                <textarea rows={2} value={noteForm.subjectiveFindings} onChange={(e) => setNoteForm((f) => ({ ...f, subjectiveFindings: e.target.value }))} placeholder="Patient's reported symptoms…" className={FTA} />
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Objective</label>
+                <textarea rows={2} value={noteForm.objectiveFindings} onChange={(e) => setNoteForm((f) => ({ ...f, objectiveFindings: e.target.value }))} placeholder="Examination findings, vitals…" className={FTA} />
+              </div>
+            </div>
+
+            {/* Row 4: Assessment + Plan */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className={LBL}>Assessment <span className="text-red-500">*</span></label>
+                <textarea rows={2} value={noteForm.assessment} onChange={(e) => setNoteForm((f) => ({ ...f, assessment: e.target.value }))} placeholder="Clinical assessment…" className={FTA} />
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Plan <span className="text-red-500">*</span></label>
+                <textarea rows={2} value={noteForm.plan} onChange={(e) => setNoteForm((f) => ({ ...f, plan: e.target.value }))} placeholder="Treatment plan…" className={FTA} />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <p className="text-xs text-slate-400"><span className="text-red-500">*</span> Required</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setNoteOpen(false)} className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                <button type="submit"
+                  className="h-8 px-5 rounded-md text-xs font-semibold text-white shadow-sm transition-colors"
+                  style={{ backgroundColor: '#3b82f6' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}>
+                  Save Note
+                </button>
+              </div>
+            </div>
+          </form>
+        </FloatingPanel>
+
+        {/* Tabs + Tables */}
+        <div className="mt-4">
+          <Tabs defaultTab="encounters">
+            <TabList>
+              <Tab id="encounters">Encounters ({filteredEnc.length})</Tab>
+              <Tab id="notes">Progress Notes ({filteredNote.length})</Tab>
+            </TabList>
+
+            <TabPanel id="encounters">
+              <Card>
+                {loading ? (<CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>)
+                  : filteredEnc.length === 0 ? (
+                    <CardBody><EmptyState icon={FileText} title="No encounters found" description="Create the first clinical encounter."
+                      action={<Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>} /></CardBody>
+                  ) : (
+                    <Table>
+                      <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Chief Complaint</Th><Th>Diagnosis</Th><Th>Date</Th><Th>Status</Th></Tr></Thead>
+                      <Tbody>
+                        {filteredEnc.map((enc) => (
+                          <Tr key={enc.id}>
+                            <Td><span className="font-medium">{getPatientName(enc.patientId)}</span></Td>
+                            <Td><Badge variant="info">{enc.encounterType || enc.type}</Badge></Td>
+                            <Td className="max-w-[200px] truncate text-muted-foreground">{enc.chiefComplaint || '—'}</Td>
+                            <Td className="max-w-[180px] truncate text-muted-foreground">{enc.diagnosis || '—'}</Td>
+                            <Td className="text-xs text-muted-foreground whitespace-nowrap">{enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}</Td>
+                            <Td><Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge></Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  )}
               </Card>
-            ))
-          )}
-        </div>
-      )}
+            </TabPanel>
 
-      {/* Modals */}
-      <Modal open={showEncounterModal} onClose={() => setShowEncounterModal(false)} title="New Clinical Encounter">
-        <EncounterForm patients={patients} onSubmit={handleCreateEncounter} onClose={() => setShowEncounterModal(false)} />
-      </Modal>
-      <Modal open={showNoteModal} onClose={() => setShowNoteModal(false)} title="New Progress Note">
-        <ProgressNoteForm patients={patients} onSubmit={handleCreateNote} onClose={() => setShowNoteModal(false)} />
-      </Modal>
+            <TabPanel id="notes">
+              <Card>
+                {loading ? (<CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>)
+                  : filteredNote.length === 0 ? (
+                    <CardBody><EmptyState icon={FileText} title="No progress notes" description="Create the first progress note."
+                      action={<Button onClick={openNote}><Plus className="h-4 w-4" /> New Note</Button>} /></CardBody>
+                  ) : (
+                    <Table>
+                      <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Subjective</Th><Th>Assessment</Th><Th>Date</Th></Tr></Thead>
+                      <Tbody>
+                        {filteredNote.map((note) => (
+                          <Tr key={note.id}>
+                            <Td><span className="font-medium">{getPatientName(note.patientId)}</span></Td>
+                            <Td><Badge variant="purple">{note.noteType || 'SOAP'}</Badge></Td>
+                            <Td className="max-w-[200px] truncate text-muted-foreground">{note.subjective || '—'}</Td>
+                            <Td className="max-w-[180px] truncate text-muted-foreground">{note.assessment || '—'}</Td>
+                            <Td className="text-xs text-muted-foreground whitespace-nowrap">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy') : '—'}</Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  )}
+              </Card>
+            </TabPanel>
+          </Tabs>
+        </div>
+
+      </div> {/* end relative wrapper */}
+
+      <style>{`@keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }`}</style>
     </div>
   );
 };

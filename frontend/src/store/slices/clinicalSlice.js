@@ -70,6 +70,8 @@ const clinicalSlice = createSlice({
     encounters: [],
     progressNotes: [],
     medicalHistory: [],
+    allEncounters: [],
+    allProgressNotes: [],
     loading: false,
     error: null,
   },
@@ -80,6 +82,9 @@ const clinicalSlice = createSlice({
       state.medicalHistory = [];
       state.error = null;
     },
+    // ── Global list setters (dispatched by Documentation.jsx on mount) ────────
+    setAllEncounters:    (state, action) => { state.allEncounters    = action.payload || []; },
+    setAllProgressNotes: (state, action) => { state.allProgressNotes = action.payload || []; },
   },
   extraReducers: (builder) => {
     const setPending = (state) => { state.loading = true; state.error = null; };
@@ -95,6 +100,7 @@ const clinicalSlice = createSlice({
 
       .addCase(createEncounter.fulfilled, (state, action) => {
         state.encounters.unshift(action.payload);
+        state.allEncounters.unshift(action.payload);
       })
 
       .addCase(fetchProgressNotesByPatient.pending, setPending)
@@ -106,6 +112,7 @@ const clinicalSlice = createSlice({
 
       .addCase(createProgressNote.fulfilled, (state, action) => {
         state.progressNotes.unshift(action.payload);
+        state.allProgressNotes.unshift(action.payload);
       })
 
       .addCase(fetchMedicalHistoryByPatient.pending, setPending)
@@ -117,5 +124,5 @@ const clinicalSlice = createSlice({
   },
 });
 
-export const { clearClinicalData } = clinicalSlice.actions;
+export const { clearClinicalData, setAllEncounters, setAllProgressNotes } = clinicalSlice.actions;
 export default clinicalSlice.reducer;

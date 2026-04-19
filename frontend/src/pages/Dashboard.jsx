@@ -1,118 +1,243 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Users, FlaskConical, Scan, Pill, Activity, ArrowRight, AlertCircle } from 'lucide-react';
+import {
+  Users, CalendarDays, FlaskConical, Pill,
+  ArrowRight, Activity, TrendingUp, Clock,
+} from 'lucide-react';
 import { fetchPatients } from '../store/slices/patientSlice';
-import { Card, CardBody, Spinner } from '../components/ui';
-import { format } from 'date-fns';
+import { fetchAppointments } from '../store/slices/appointmentSlice';
+import { setAllLabOrders, setAllImagingOrders } from '../store/slices/ordersSlice';
+import { labOrderService, imagingOrderService } from '../api/order.service.js';
+import { Card, CardBody, CardHeader, Spinner, Badge, statusVariant } from '../components/ui';
+import { format, isToday, parseISO } from 'date-fns';
 
-const StatCard = ({ label, value, icon: Icon, color, onClick }) => (
+const toArray = (res) => {
+  if (Array.isArray(res))       return res;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
+};
+
+// ── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ label, value, icon: Icon, gradient, onClick, loading }) => (
   <div
     onClick={onClick}
-    className={`bg-card border border-border rounded-xl p-6 shadow-sm flex items-start gap-4 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 group`}
+    className="relative overflow-hidden rounded-xl p-6 cursor-pointer group transition-all hover:shadow-lg hover:-translate-y-0.5"
+    style={{ background: gradient }}
   >
-    <div className={`h-13 w-13 rounded-xl flex items-center justify-center p-3 ${color}`}>
-      <Icon className="h-7 w-7" />
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm font-medium text-white/80 mb-1">{label}</p>
+        {loading ? (
+          <div className="h-8 w-16 rounded bg-white/20 animate-pulse" />
+        ) : (
+          <p className="text-3xl font-bold text-white">{value ?? '—'}</p>
+        )}
+      </div>
+      <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
+        <Icon className="h-6 w-6 text-white" />
+      </div>
     </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-3xl font-bold text-foreground">{value}</p>
-      <p className="text-sm text-muted-foreground mt-0.5">{label}</p>
+    <div className="absolute bottom-3 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+      <ArrowRight className="h-4 w-4 text-white/70" />
     </div>
-    <ArrowRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors mt-1" />
   </div>
 );
 
+// ── Quick Action ─────────────────────────────────────────────────────────────
+const QuickAction = ({ label, icon: Icon, onClick, color }) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center gap-2 rounded-xl border p-5 text-sm font-medium transition-all hover:shadow-sm hover:-translate-y-0.5 ${color}`}
+  >
+    <Icon className="h-6 w-6" />
+    <span>{label}</span>
+  </button>
+);
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { list: patients, loading } = useSelector((s) => s.patients);
+  const { user } = useSelector((s) => s.auth);
+  const { list: patients, loading: pLoading } = useSelector((s) => s.patients);
+  const { list: appointments, loading: aLoading } = useSelector((s) => s.appointments);
+  const { allLabOrders, allImagingOrders } = useSelector((s) => s.orders);
 
   useEffect(() => {
     dispatch(fetchPatients());
+    dispatch(fetchAppointments());
+    labOrderService.getAll()
+      .then((res) => dispatch(setAllLabOrders(toArray(res))))
+      .catch(() => {});
+    imagingOrderService.getAll()
+      .then((res) => dispatch(setAllImagingOrders(toArray(res))))
+      .catch(() => {});
   }, [dispatch]);
 
-  // Recent patients (latest 5)
-  const recent = [...(patients || [])].slice(0, 5);
+  // Today's appointments
+  const todayAppts = appointments.filter((a) => {
+    try { return isToday(parseISO(a.appointmentDate || a.date)); }
+    catch { return false; }
+  });
+
+  const pendingAppts = appointments.filter(
+    (a) => a.status?.toLowerCase() === 'scheduled'
+  ).length;
+
+  const recentPatients = [...patients].slice(0, 6);
+
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
-    <div className="space-y-8">
-      {/* Welcome banner */}
-      <div className="rounded-xl bg-gradient-to-br from-primary to-blue-700 p-8 text-white shadow-lg">
-        <h1 className="text-2xl md:text-3xl font-bold">Welcome back, Dr. Smith</h1>
-        <p className="mt-1 text-blue-100 text-sm">
-          {format(new Date(), "EEEE, MMMM do yyyy")} — Here's your clinical overview for today.
-        </p>
-      </div>
+    <div className="space-y-8 animate-fade-in">
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Patients" value={patients.length} icon={Users} color="bg-blue-100 text-blue-600" onClick={() => navigate('/patients')} />
-        <StatCard label="Clinical Documentation" value="—" icon={Activity} color="bg-indigo-100 text-indigo-600" onClick={() => navigate('/documentation')} />
-        <StatCard label="Active Orders" value="—" icon={FlaskConical} color="bg-purple-100 text-purple-600" onClick={() => navigate('/orders')} />
-        <StatCard label="Prescriptions" value="—" icon={Pill} color="bg-green-100 text-green-600" onClick={() => navigate('/medications')} />
-      </div>
-
-      {/* Recent Patients */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Recent Patients</h2>
-          <button onClick={() => navigate('/patients')} className="text-sm text-primary hover:underline flex items-center gap-1">
-            View all <ArrowRight className="h-4 w-4" />
-          </button>
+      {/* Welcome Banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 p-8 text-white shadow-lg">
+        <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10" />
+        <div className="absolute bottom-0 right-20 h-24 w-24 rounded-full bg-white/5" />
+        <div className="relative z-10">
+          <p className="text-blue-200 text-sm font-medium mb-1">
+            {format(new Date(), "EEEE, MMMM do yyyy")}
+          </p>
+          <h1 className="text-2xl md:text-3xl font-bold">
+            {greeting()}, {user?.username || 'Doctor'} 👋
+          </h1>
+          <p className="mt-2 text-blue-100 text-sm max-w-lg">
+            Here's your clinical overview. You have{' '}
+            <span className="font-semibold text-white">{todayAppts.length}</span>{' '}
+            appointment{todayAppts.length !== 1 ? 's' : ''} scheduled for today.
+          </p>
         </div>
+      </div>
 
-        {loading ? (
-          <div className="flex justify-center py-10"><Spinner /></div>
-        ) : patients.length === 0 ? (
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Patients"   value={patients.length}  icon={Users}
+          gradient="linear-gradient(135deg, #3b82f6, #2563eb)"
+          loading={pLoading}       onClick={() => navigate('/patients')}
+        />
+        <StatCard
+          label="Today's Appointments" value={todayAppts.length} icon={CalendarDays}
+          gradient="linear-gradient(135deg, #8b5cf6, #7c3aed)"
+          loading={aLoading}       onClick={() => navigate('/appointments')}
+        />
+        <StatCard
+          label="Scheduled (Pending)" value={pendingAppts} icon={Clock}
+          gradient="linear-gradient(135deg, #f59e0b, #d97706)"
+          loading={aLoading}       onClick={() => navigate('/appointments')}
+        />
+        <StatCard
+          label="Lab & Imaging Orders" value={allLabOrders.length + allImagingOrders.length} icon={FlaskConical}
+          gradient="linear-gradient(135deg, #10b981, #059669)"
+          onClick={() => navigate('/orders')}
+        />
+      </div>
+
+      {/* Main content: Recent Patients + Today's Schedule */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        {/* Recent Patients */}
+        <div className="xl:col-span-2">
           <Card>
-            <CardBody>
-              <div className="text-center py-6 text-muted-foreground">
-                <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p>No patients registered yet.</p>
-              </div>
+            <CardHeader
+              action={
+                <button onClick={() => navigate('/patients')} className="text-sm text-primary hover:underline flex items-center gap-1">
+                  View all <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              }
+            >
+              <p className="font-semibold text-foreground">Recent Patients</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{patients.length} total registered</p>
+            </CardHeader>
+            <CardBody className="p-0">
+              {pLoading ? (
+                <div className="flex justify-center py-10"><Spinner /></div>
+              ) : recentPatients.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground text-sm">
+                  <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                  No patients registered yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {recentPatients.map((p) => (
+                    <div
+                      key={p.id}
+                      onClick={() => navigate(`/patients/${p.id}`)}
+                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 cursor-pointer transition-colors group"
+                    >
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+                        {p.firstName?.[0]}{p.lastName?.[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {p.firstName} {p.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.gender ?? '—'} · {p.dateOfBirth ? format(new Date(p.dateOfBirth), 'MMM dd, yyyy') : 'DOB unknown'}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardBody>
           </Card>
-        ) : (
-          <div className="grid gap-3">
-            {recent.map((p) => (
-              <div
-                key={p.id}
-                onClick={() => navigate(`/patients/${p.id}`)}
-                className="bg-card border border-border rounded-lg p-4 flex items-center gap-4 hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer group"
-              >
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
-                  {p.firstName?.[0]}{p.lastName?.[0]}
+        </div>
+
+        {/* Today's Schedule */}
+        <div>
+          <Card>
+            <CardHeader>
+              <p className="font-semibold text-foreground">Today's Schedule</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(), 'MMM d, yyyy')}</p>
+            </CardHeader>
+            <CardBody className="p-0">
+              {aLoading ? (
+                <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+              ) : todayAppts.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                  No appointments today.
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground">{p.firstName} {p.lastName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{p.gender} • {p.dateOfBirth ? format(new Date(p.dateOfBirth), 'MMM dd, yyyy') : 'DOB unknown'}</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {todayAppts.slice(0, 6).map((a) => (
+                    <div key={a.id} className="px-5 py-3 flex items-center gap-3">
+                      <div className="text-xs text-muted-foreground w-14 flex-shrink-0 font-mono">
+                        {a.appointmentTime || a.time || '--:--'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {a.patientName || `Patient #${a.patientId}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{a.reason || a.type || 'Appointment'}</p>
+                      </div>
+                      <Badge variant={statusVariant(a.status)}>{a.status || 'Scheduled'}</Badge>
+                    </div>
+                  ))}
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-colors" />
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </CardBody>
+          </Card>
+        </div>
       </div>
 
-      {/* Quick actions */}
+      {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'New Patient', icon: Users, path: '/patients', color: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' },
-            { label: 'New Encounter', icon: Activity, path: '/documentation', color: 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100' },
-            { label: 'Lab Order', icon: FlaskConical, path: '/orders', color: 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100' },
-            { label: 'Prescribe', icon: Pill, path: '/medications', color: 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' },
-          ].map(({ label, icon: Icon, path, color }) => (
-            <button
-              key={label}
-              onClick={() => navigate(path)}
-              className={`border rounded-lg p-4 flex flex-col items-center gap-2 transition-colors ${color}`}
-            >
-              <Icon className="h-6 w-6" />
-              <span className="text-sm font-medium">{label}</span>
-            </button>
-          ))}
+        <h2 className="text-base font-semibold text-foreground mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <QuickAction label="Patients"      icon={Users}        onClick={() => navigate('/patients')}     color="border-blue-200   bg-blue-50   text-blue-700   hover:bg-blue-100" />
+          <QuickAction label="Appointments"  icon={CalendarDays} onClick={() => navigate('/appointments')} color="border-purple-200  bg-purple-50  text-purple-700  hover:bg-purple-100" />
+          <QuickAction label="Lab Orders"    icon={FlaskConical} onClick={() => navigate('/orders')}       color="border-green-200  bg-green-50  text-green-700   hover:bg-green-100" />
+          <QuickAction label="Prescriptions" icon={Pill}         onClick={() => navigate('/medications')}  color="border-amber-200  bg-amber-50  text-amber-700   hover:bg-amber-100" />
         </div>
       </div>
     </div>

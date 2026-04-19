@@ -72,6 +72,7 @@ const ordersSlice = createSlice({
     labResults: [],
     allLabOrders: [],
     allImagingOrders: [],
+    allLabResults: [],
     loading: false,
     error: null,
   },
@@ -82,6 +83,10 @@ const ordersSlice = createSlice({
       state.labResults = [];
       state.error = null;
     },
+    // ── Global list setters (dispatched by Orders.jsx on mount) ──────────────
+    setAllLabOrders:     (state, action) => { state.allLabOrders     = action.payload || []; },
+    setAllImagingOrders: (state, action) => { state.allImagingOrders = action.payload || []; },
+    setAllLabResults:    (state, action) => { state.allLabResults    = action.payload || []; },
   },
   extraReducers: (builder) => {
     const setPending = (state) => { state.loading = true; state.error = null; };
@@ -109,6 +114,7 @@ const ordersSlice = createSlice({
 
       .addCase(createImagingOrder.fulfilled, (state, action) => {
         state.imagingOrders.unshift(action.payload);
+        state.allImagingOrders.unshift(action.payload);
       })
 
       .addCase(fetchLabResultsByPatient.pending, setPending)
@@ -120,5 +126,5 @@ const ordersSlice = createSlice({
   },
 });
 
-export const { clearOrdersData } = ordersSlice.actions;
+export const { clearOrdersData, setAllLabOrders, setAllImagingOrders, setAllLabResults } = ordersSlice.actions;
 export default ordersSlice.reducer;

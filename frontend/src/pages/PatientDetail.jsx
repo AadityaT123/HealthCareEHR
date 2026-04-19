@@ -1,163 +1,362 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchPatientById, clearCurrentPatient } from '../store/slices/patientSlice';
-import { ArrowLeft, Edit, Activity, HeartPulse, FileText, User } from 'lucide-react';
+import { fetchPatientById, clearCurrentPatient, updatePatient } from '../store/slices/patientSlice';
+import { fetchMedicalHistoryByPatient, fetchEncountersByPatient, fetchProgressNotesByPatient, clearClinicalData } from '../store/slices/clinicalSlice';
+import { fetchLabOrdersByPatient, fetchImagingOrdersByPatient } from '../store/slices/ordersSlice';
+import { fetchPrescriptionsByPatient } from '../store/slices/medicationsSlice';
+import { fetchAppointmentsByPatient } from '../store/slices/appointmentSlice';
+import { ArrowLeft, Edit, User, HeartPulse, FileText, Activity, Pill, CalendarDays, X } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
+import {
+  Card, CardHeader, CardBody, Tabs, TabList, Tab, TabPanel,
+  Badge, Spinner, EmptyState, Button, Modal, Input, Select,
+  statusVariant, Alert,
+} from '../components/ui';
+
+const InfoRow = ({ label, value }) => (
+  <div className="flex gap-4 py-2 border-b border-border/50 last:border-0">
+    <dt className="text-sm text-muted-foreground w-36 flex-shrink-0">{label}</dt>
+    <dd className="text-sm font-medium text-foreground flex-1">{value || '—'}</dd>
+  </div>
+);
 
 const PatientDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const { currentPatient, loading, error } = useSelector((state) => state.patients);
-  const [activeTab, setActiveTab] = useState('overview');
+  const { id }    = useParams();
+  const navigate  = useNavigate();
+  const dispatch  = useDispatch();
+
+  const { currentPatient, loading, error } = useSelector((s) => s.patients);
+  const { encounters, progressNotes, medicalHistory, loading: cLoading } = useSelector((s) => s.clinical);
+  const { labOrders, imagingOrders, loading: oLoading } = useSelector((s) => s.orders);
+  const { prescriptions, loading: mLoading } = useSelector((s) => s.medications);
+  const { patientList: appts, loading: aLoading } = useSelector((s) => s.appointments);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editErr,  setEditErr]  = useState('');
 
   useEffect(() => {
+    if (!id) return;
     dispatch(fetchPatientById(id));
-    return () => { dispatch(clearCurrentPatient()); };
+    dispatch(fetchMedicalHistoryByPatient(id));
+    dispatch(fetchEncountersByPatient(id));
+    dispatch(fetchProgressNotesByPatient(id));
+    dispatch(fetchLabOrdersByPatient(id));
+    dispatch(fetchImagingOrdersByPatient(id));
+    dispatch(fetchPrescriptionsByPatient(id));
+    dispatch(fetchAppointmentsByPatient(id));
+    return () => {
+      dispatch(clearCurrentPatient());
+      dispatch(clearClinicalData());
+    };
   }, [dispatch, id]);
 
-  const calculateAge = (dob) => {
-    if (!dob) return '-';
+  const calcAge = (dob) => {
+    if (!dob) return null;
     return differenceInYears(new Date(), new Date(dob));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-          <p className="text-muted-foreground">Loading patient profile...</p>
-        </div>
-      </div>
-    );
-  }
+  const openEdit = () => {
+    setEditErr('');
+    setEditForm({
+      firstName: currentPatient?.firstName || '',
+      lastName:  currentPatient?.lastName  || '',
+      gender:    currentPatient?.gender    || '',
+      bloodType: currentPatient?.bloodType || '',
+      contactInformation: { ...currentPatient?.contactInformation },
+    });
+    setEditOpen(true);
+  };
 
-  if (error || !currentPatient) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <div className="text-destructive font-medium">{error || 'Patient not found'}</div>
-        <button onClick={() => navigate('/patients')} className="flex items-center text-primary hover:underline">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Patients
-        </button>
-      </div>
-    );
-  }
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.firstName || !editForm.lastName) {
+      setEditErr('First and last name are required.');
+      return;
+    }
+    const result = await dispatch(updatePatient({ id, data: editForm }));
+    if (updatePatient.fulfilled.match(result)) setEditOpen(false);
+    else setEditErr(result.payload || 'Update failed.');
+  };
 
-  const patient = currentPatient;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-60 gap-3">
+      <Spinner size="lg" />
+      <p className="text-sm text-muted-foreground">Loading patient profile…</p>
+    </div>
+  );
+
+  if (error || !currentPatient) return (
+    <div className="flex flex-col items-center justify-center h-60 gap-4">
+      <p className="text-destructive font-medium">{error || 'Patient not found'}</p>
+      <Button variant="outline" onClick={() => navigate('/patients')}>
+        <ArrowLeft className="h-4 w-4" /> Back to Patients
+      </Button>
+    </div>
+  );
+
+  const p   = currentPatient;
+  const age = calcAge(p.dateOfBirth);
 
   return (
-    <div className="space-y-6">
-      {/* Header / Breadcrumbs */}
-      <div className="flex items-center text-sm text-muted-foreground cursor-pointer hover:text-primary transition-colors" onClick={() => navigate('/patients')}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Patients
-      </div>
+    <div className="space-y-6 animate-fade-in">
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+      {/* Back */}
+      <button onClick={() => navigate('/patients')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+        <ArrowLeft className="h-4 w-4" /> Back to Patients
+      </button>
+
+      {/* Profile Header */}
+      <div className="flex flex-col md:flex-row gap-5 items-start md:items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-            <User className="h-10 w-10" />
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-xl font-bold flex-shrink-0">
+            {p.firstName?.[0]}{p.lastName?.[0]}
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              {patient.firstName} {patient.lastName}
-            </h1>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-muted-foreground">
-              <span>MRN: <span className="font-mono text-foreground">{patient.id.substring(0, 8)}</span></span>
-              <span>DOB: <span className="font-medium text-foreground">{patient.dateOfBirth ? format(new Date(patient.dateOfBirth), 'MMM dd, yyyy') : 'N/A'}</span></span>
-              <span>Age: <span className="font-medium text-foreground">{calculateAge(patient.dateOfBirth)}</span></span>
-              <span>Gender: <span className="font-medium text-foreground">{patient.gender}</span></span>
+            <h1 className="text-2xl font-bold text-foreground">{p.firstName} {p.lastName}</h1>
+            <div className="flex flex-wrap gap-3 mt-1 text-sm text-muted-foreground">
+              <span>MRN: <span className="font-mono text-foreground">{String(p.id).padStart(8, '0')}</span></span>
+              {age !== null && <span>Age: <span className="font-medium text-foreground">{age} yrs</span></span>}
+              <span>Gender: <span className="font-medium text-foreground">{p.gender || '—'}</span></span>
+              {p.bloodType && <Badge variant="info">{p.bloodType}</Badge>}
             </div>
           </div>
         </div>
-        <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-muted h-10 px-4 py-2">
-          <Edit className="mr-2 h-4 w-4" /> Edit Profile
-        </button>
+        <Button variant="outline" onClick={openEdit}>
+          <Edit className="h-4 w-4" /> Edit Profile
+        </Button>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-border">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          {['overview', 'insurance', 'history'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`
-                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize transition-colors
-                ${activeTab === tab 
-                  ? 'border-primary text-primary' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}
-              `}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <Tabs defaultTab="overview">
+        <TabList>
+          <Tab id="overview">Overview</Tab>
+          <Tab id="encounters">Encounters</Tab>
+          <Tab id="notes">Progress Notes</Tab>
+          <Tab id="orders">Orders</Tab>
+          <Tab id="medications">Medications</Tab>
+          <Tab id="history">Medical History</Tab>
+          <Tab id="appointments">Appointments</Tab>
+        </TabList>
 
-      {/* Tab Content */}
-      <div className="mt-6">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="col-span-1 border border-border bg-card rounded-lg p-5 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 flex items-center text-foreground">
-                <Activity className="mr-2 h-5 w-5 text-primary" /> Contact Information
-              </h3>
-              <dl className="space-y-3 text-sm">
-                <div className="grid grid-cols-3">
-                  <dt className="text-muted-foreground">Phone</dt>
-                  <dd className="col-span-2 font-medium text-foreground">{patient.contactInformation?.phone || 'Not provided'}</dd>
+        {/* Overview */}
+        <TabPanel id="overview">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><p className="font-semibold text-sm">Contact Information</p></CardHeader>
+              <CardBody>
+                <dl>
+                  <InfoRow label="Phone"   value={p.contactInformation?.phone} />
+                  <InfoRow label="Email"   value={p.contactInformation?.email} />
+                  <InfoRow label="Address" value={p.contactInformation?.address} />
+                </dl>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader><p className="font-semibold text-sm">Clinical Details</p></CardHeader>
+              <CardBody>
+                <dl>
+                  <InfoRow label="Date of Birth" value={p.dateOfBirth ? format(new Date(p.dateOfBirth), 'MMMM dd, yyyy') : null} />
+                  <InfoRow label="Blood Type"    value={p.bloodType} />
+                  <InfoRow label="Emergency Contact" value={p.emergencyContact} />
+                  <InfoRow label="Insurance"     value={p.insuranceDetails?.provider} />
+                </dl>
+              </CardBody>
+            </Card>
+          </div>
+        </TabPanel>
+
+        {/* Encounters */}
+        <TabPanel id="encounters">
+          {cLoading ? <div className="flex justify-center py-10"><Spinner /></div>
+            : encounters.length === 0
+              ? <EmptyState icon={FileText} title="No encounters" description="No clinical encounters documented for this patient." />
+              : (
+                <div className="space-y-3">
+                  {encounters.map((enc) => (
+                    <Card key={enc.id}>
+                      <CardBody>
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium text-foreground">{enc.chiefComplaint || enc.type || 'Encounter'}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy HH:mm') : '—'}
+                            </p>
+                            {enc.diagnosis && <p className="text-sm mt-2 text-muted-foreground">{enc.diagnosis}</p>}
+                          </div>
+                          <Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
                 </div>
-                <div className="grid grid-cols-3">
-                  <dt className="text-muted-foreground">Email</dt>
-                  <dd className="col-span-2 font-medium text-foreground truncate" title={patient.contactInformation?.email}>{patient.contactInformation?.email || 'Not provided'}</dd>
+              )}
+        </TabPanel>
+
+        {/* Progress Notes */}
+        <TabPanel id="notes">
+          {cLoading ? <div className="flex justify-center py-10"><Spinner /></div>
+            : progressNotes.length === 0
+              ? <EmptyState icon={FileText} title="No progress notes" description="No progress notes found for this patient." />
+              : (
+                <div className="space-y-3">
+                  {progressNotes.map((note) => (
+                    <Card key={note.id}>
+                      <CardBody>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-foreground">{note.noteType || 'Progress Note'}</span>
+                              <Badge variant="info">{note.noteType || 'SOAP'}</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy') : '—'}</p>
+                            {note.subjective && <p className="text-sm mt-2">{note.subjective}</p>}
+                          </div>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
                 </div>
-                <div className="grid grid-cols-3">
-                  <dt className="text-muted-foreground">Address</dt>
-                  <dd className="col-span-2 font-medium text-foreground">{patient.contactInformation?.address || 'Not provided'}</dd>
-                </div>
-              </dl>
+              )}
+        </TabPanel>
+
+        {/* Orders */}
+        <TabPanel id="orders">
+          {oLoading ? <div className="flex justify-center py-10"><Spinner /></div> : (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Lab Orders ({labOrders.length})</h3>
+                {labOrders.length === 0
+                  ? <p className="text-sm text-muted-foreground">No lab orders.</p>
+                  : labOrders.map((o) => (
+                    <div key={o.id} className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                      <Activity className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{o.testName || o.panelName || 'Lab Test'}</p>
+                        <p className="text-xs text-muted-foreground">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</p>
+                      </div>
+                      <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
+                    </div>
+                  ))}
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground mb-3">Imaging Orders ({imagingOrders.length})</h3>
+                {imagingOrders.length === 0
+                  ? <p className="text-sm text-muted-foreground">No imaging orders.</p>
+                  : imagingOrders.map((o) => (
+                    <div key={o.id} className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
+                      <Activity className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{o.imagingType || 'Imaging'}</p>
+                        <p className="text-xs text-muted-foreground">{o.bodyPart} — {o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</p>
+                      </div>
+                      <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
+                    </div>
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </TabPanel>
 
-        {activeTab === 'insurance' && (
-          <div className="bg-card border border-border rounded-lg p-5 shadow-sm max-w-2xl">
-            <h3 className="text-lg font-semibold mb-4 text-foreground">Insurance Details</h3>
-            {patient.insuranceDetails ? (
-              <dl className="space-y-4 text-sm">
-                <div className="grid grid-cols-3 border-b border-border pb-2">
-                  <dt className="text-muted-foreground">Provider</dt>
-                  <dd className="col-span-2 font-medium text-foreground">{patient.insuranceDetails.provider || 'N/A'}</dd>
+        {/* Medications */}
+        <TabPanel id="medications">
+          {mLoading ? <div className="flex justify-center py-10"><Spinner /></div>
+            : prescriptions.length === 0
+              ? <EmptyState icon={Pill} title="No prescriptions" description="No medications prescribed for this patient." />
+              : (
+                <div className="space-y-2">
+                  {prescriptions.map((rx) => (
+                    <div key={rx.id} className="flex items-center gap-4 p-4 border border-border rounded-lg bg-card">
+                      <Pill className="h-5 w-5 text-primary flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{rx.medicationName || rx.medication?.name || 'Medication'}</p>
+                        <p className="text-xs text-muted-foreground">{rx.dosage} · {rx.frequency} · {rx.route}</p>
+                      </div>
+                      <Badge variant={statusVariant(rx.status)}>{rx.status || 'Active'}</Badge>
+                    </div>
+                  ))}
                 </div>
-                <div className="grid grid-cols-3">
-                  <dt className="text-muted-foreground">Policy Number</dt>
-                  <dd className="col-span-2 font-mono font-medium text-foreground">{patient.insuranceDetails.policyNumber || 'N/A'}</dd>
+              )}
+        </TabPanel>
+
+        {/* Medical History */}
+        <TabPanel id="history">
+          {cLoading ? <div className="flex justify-center py-10"><Spinner /></div>
+            : medicalHistory.length === 0
+              ? <EmptyState icon={HeartPulse} title="No medical history" description="No conditions documented for this patient." />
+              : (
+                <div className="space-y-3">
+                  {medicalHistory.map((item) => (
+                    <Card key={item.id}>
+                      <CardBody>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium text-foreground">{item.conditionName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Diagnosed: {item.diagnosisDate ? format(new Date(item.diagnosisDate), 'MMM dd, yyyy') : 'Unknown'}
+                            </p>
+                            {item.notes && <p className="text-sm text-muted-foreground mt-2">{item.notes}</p>}
+                          </div>
+                          <Badge variant={statusVariant(item.status)}>{item.status || 'Active'}</Badge>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))}
                 </div>
-              </dl>
-            ) : (
-               <div className="p-4 bg-muted/30 rounded-md text-sm text-muted-foreground border border-dashed border-border/60">
-                 No insurance information provided.
-               </div>
-            )}
+              )}
+        </TabPanel>
+
+        {/* Appointments */}
+        <TabPanel id="appointments">
+          {aLoading ? <div className="flex justify-center py-10"><Spinner /></div>
+            : appts.length === 0
+              ? <EmptyState icon={CalendarDays} title="No appointments" description="No appointments found for this patient." />
+              : (
+                <div className="space-y-2">
+                  {appts.map((a) => (
+                    <div key={a.id} className="flex items-center gap-4 p-4 border border-border rounded-lg bg-card">
+                      <CalendarDays className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{a.reason || a.type || 'Appointment'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {a.appointmentDate ? format(new Date(a.appointmentDate), 'MMM dd, yyyy') : '—'}
+                          {a.appointmentTime ? ` at ${a.appointmentTime}` : ''}
+                        </p>
+                      </div>
+                      <Badge variant={statusVariant(a.status)}>{a.status || 'Scheduled'}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+        </TabPanel>
+      </Tabs>
+
+      {/* Edit Modal */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Patient Profile">
+        <form onSubmit={handleEdit} className="space-y-4">
+          {editErr && <Alert variant="error">{editErr}</Alert>}
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="First Name" required value={editForm.firstName || ''}
+              onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} />
+            <Input label="Last Name" required value={editForm.lastName || ''}
+              onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} />
           </div>
-        )}
-        
-        {activeTab === 'history' && (
-           <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
-             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-foreground flex items-center">
-                <HeartPulse className="mr-2 h-5 w-5 text-primary" /> Medical History
-              </h3>
-              <button className="text-sm font-medium text-primary hover:underline">Add Entry</button>
-             </div>
-             <div className="p-8 text-center text-muted-foreground border border-dashed border-border/50 rounded-md">
-               No medical history documented yet. Use the API to manage history.
-             </div>
-           </div>
-        )}
-      </div>
+          <Select label="Gender" value={editForm.gender || ''}
+            onChange={(e) => setEditForm((f) => ({ ...f, gender: e.target.value }))}>
+            <option value="">Select gender</option>
+            <option>Male</option><option>Female</option><option>Other</option>
+          </Select>
+          <Input label="Phone" value={editForm.contactInformation?.phone || ''}
+            onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, phone: e.target.value } }))} />
+          <Input label="Email" type="email" value={editForm.contactInformation?.email || ''}
+            onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, email: e.target.value } }))} />
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" type="button" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button type="submit">Save Changes</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

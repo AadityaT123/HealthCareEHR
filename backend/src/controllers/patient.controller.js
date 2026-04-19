@@ -48,38 +48,39 @@ const getPatientById = async (req, res) => {
 
 // POST /api/patients
 const createPatientHandler = async (req, res) => {
-    const { firstName, lastName, dateOfBirth, gender, contactInformation, insuranceDetails } = req.body;
+    const { firstName, lastName, dateOfBirth, gender, contactInformation, insuranceDetails, bloodType, emergencyContact } = req.body;
 
     const missing = [];
-    if (!firstName)  missing.push("firstName");
-    if (!lastName)   missing.push("lastName");
+    if (!firstName)   missing.push("firstName");
+    if (!lastName)    missing.push("lastName");
     if (!dateOfBirth) missing.push("dateOfBirth");
-    if (!gender)     missing.push("gender");
+    if (!gender)      missing.push("gender");
 
     if (missing.length > 0)
         return res.status(400).json({ success: false, message: `Missing required fields: ${missing.join(", ")}` });
-
-    if (!contactInformation?.email || !contactInformation?.phone)
-        return res.status(400).json({ success: false, message: "contactInformation must include email and phone" });
 
     const validGenders = ["Male", "Female", "Other"];
     if (!validGenders.includes(gender))
         return res.status(400).json({ success: false, message: `Invalid gender. Must be one of: ${validGenders.join(", ")}` });
 
     try {
-        // Check email uniqueness across all patients (JSONB field)
-        const existing = await Patient.findOne({
-            where: { contactInformation: { email: contactInformation.email } }
-        });
-        if (existing)
-            return res.status(409).json({ success: false, message: "Email already exists" });
+        // Duplicate email check only when provided
+        if (contactInformation?.email) {
+            const existing = await Patient.findOne({
+                where: { contactInformation: { email: contactInformation.email } }
+            });
+            if (existing)
+                return res.status(409).json({ success: false, message: "A patient with this email already exists" });
+        }
 
         const patient = await Patient.create({
             firstName, lastName, dateOfBirth, gender,
+            bloodType:        bloodType        || null,
+            emergencyContact: emergencyContact || null,
             contactInformation: {
-                email:   contactInformation.email   || "",
-                phone:   contactInformation.phone   || "",
-                address: contactInformation.address || ""
+                email:   contactInformation?.email   || "",
+                phone:   contactInformation?.phone   || "",
+                address: contactInformation?.address || ""
             },
             insuranceDetails: {
                 provider:     insuranceDetails?.provider     || "",
@@ -94,6 +95,7 @@ const createPatientHandler = async (req, res) => {
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
 
 // PUT /api/patients/:id
 const updatePatient = async (req, res) => {

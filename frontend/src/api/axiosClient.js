@@ -1,30 +1,28 @@
 import axios from 'axios';
 
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Needed if using httpOnly cookies as mentioned in the prompt
 });
 
+// ── Request interceptor — attach Bearer token ──────────────────────────────
 axiosClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('ehr_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
+// ── Response interceptor — unwrap data, handle 401 globally ───────────────
 axiosClient.interceptors.response.use(
-  (response) => {
-    return response.data; // Usually APIs return data wrapped, adapt as needed based on backend
-  },
+  (response) => response.data, // unwrap so callers get { success, data, message } directly
   (error) => {
-    // Global error handling could go here (e.g. logging out on 401)
-    if (error.response && error.response.status === 401) {
-      // localStorage.removeItem('token');
-      // window.location.href = '/login';
+    if (error.response?.status === 401) {
+      // Use a custom event to avoid circular import with the Redux store
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     }
     return Promise.reject(error);
   }

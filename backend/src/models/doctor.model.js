@@ -21,7 +21,7 @@ const Doctor = sequelize.define("Doctor", {
     },
     email: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         unique: true
     },
     phone: {
@@ -30,7 +30,7 @@ const Doctor = sequelize.define("Doctor", {
     },
     licenseNumber: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
         unique: true
     },
     isActive: {

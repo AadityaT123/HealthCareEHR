@@ -45,15 +45,7 @@ const Header = () => {
 
       {/* Right section */}
       <div className="flex items-center gap-3">
-        {/* Global search */}
-        <div className="hidden md:flex items-center bg-muted/60 rounded-lg px-3 py-1.5 w-56 focus-within:w-72 focus-within:ring-1 focus-within:ring-primary/40 focus-within:bg-background transition-all duration-200">
-          <Search className="h-4 w-4 text-muted-foreground mr-2 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search patients, orders..."
-            className="bg-transparent border-none focus:outline-none text-sm w-full text-foreground placeholder:text-muted-foreground"
-          />
-        </div>
+
 
         {/* Notification bell */}
         <button

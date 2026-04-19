@@ -234,21 +234,15 @@ const updateImagingOrder = async (req, res) => {
     }
 };
 
-// DELETE /api/imaging-orders/:id — soft cancel
+// DELETE /api/imaging-orders/:id — hard delete
 const cancelImagingOrder = async (req, res) => {
     try {
         const order = await ImagingOrder.findByPk(req.params.id);
         if (!order)
             return res.status(404).json({ success: false, message: "Imaging order not found" });
 
-        if (order.status === "Completed")
-            return res.status(400).json({ success: false, message: "Cannot cancel a completed imaging order" });
-
-        if (order.status === "Cancelled")
-            return res.status(400).json({ success: false, message: "Imaging order is already cancelled" });
-
-        await order.update({ status: "Cancelled" });
-        return res.status(200).json({ success: true, message: "Imaging order cancelled successfully" });
+        await order.destroy({ force: true });
+        return res.status(200).json({ success: true, message: "Imaging order deleted successfully" });
     } catch (err) {
         console.error("cancelImagingOrder error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

@@ -116,13 +116,15 @@ const updatePatient = async (req, res) => {
                 return res.status(409).json({ success: false, message: "Email already exists" });
         }
 
-        const { firstName, lastName, dateOfBirth, gender, contactInformation, insuranceDetails } = req.body;
+        const { firstName, lastName, dateOfBirth, gender, contactInformation, insuranceDetails, bloodType, emergencyContact } = req.body;
 
         await patient.update({
             ...(firstName  && { firstName }),
             ...(lastName   && { lastName }),
             ...(dateOfBirth && { dateOfBirth }),
             ...(gender     && { gender }),
+            ...(bloodType  !== undefined && { bloodType }),
+            ...(emergencyContact !== undefined && { emergencyContact }),
             ...(contactInformation && {
                 contactInformation: { ...patient.contactInformation, ...contactInformation }
             }),

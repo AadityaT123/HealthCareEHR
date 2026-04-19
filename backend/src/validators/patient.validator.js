@@ -16,6 +16,7 @@ export const createPatientV = Joi.object({
     insuranceDetails: Joi.object({
         provider:     Joi.string().optional().allow('', null),
         policyNumber: Joi.string().optional().allow('', null),
+        groupNumber:  Joi.string().optional().allow('', null),
     }).optional(),
 });
 
@@ -34,5 +35,6 @@ export const updatePatientV = Joi.object({
     insuranceDetails: Joi.object({
         provider:     Joi.string().optional().allow('', null),
         policyNumber: Joi.string().optional().allow('', null),
+        groupNumber:  Joi.string().optional().allow('', null),
     }).optional(),
 }).min(1);

@@ -33,7 +33,7 @@ const ImagingOrder = sequelize.define("ImagingOrder", {
         defaultValue: "Routine"
     },
     status: {
-        type: DataTypes.ENUM("Ordered", "Scheduled", "In Progress", "Completed", "Cancelled"),
+        type: DataTypes.ENUM("Ordered", "Scheduled", "In Progress", "Completed", "Cancelled", "Rejected"),
         defaultValue: "Ordered"
     },
     clinicalReason: {

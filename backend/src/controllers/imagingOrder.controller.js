@@ -3,7 +3,7 @@ import integrations from "../integrations/index.js";
 import { getPagination, getPagingData } from "../utils/pagination.js";
 import GlobalTaskQueue from "../services/queue.service.js";
 
-const VALID_IMAGING_TYPES = ["X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography"];
+const VALID_IMAGING_TYPES = ["X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography", "Echocardiogram"];
 const VALID_PRIORITIES     = ["Routine", "Urgent", "STAT"];
 const TERMINAL_STATUSES    = ["Completed", "Cancelled"];
 

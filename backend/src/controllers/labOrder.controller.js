@@ -111,12 +111,13 @@ const getLabOrdersByDoctorId = async (req, res) => {
 
 // POST /api/lab-orders
 const createLabOrderHandler = async (req, res) => {
-    const { patientId, doctorId, testType, orderDate, priority, notes } = req.body;
+    const { patientId, doctorId, testType, testName, orderDate, priority, notes } = req.body;
 
     const missing = [];
     if (!patientId) missing.push("patientId");
     if (!doctorId)  missing.push("doctorId");
     if (!testType)  missing.push("testType");
+    if (!testName)  missing.push("testName"); // require testName now
     if (!orderDate) missing.push("orderDate");
 
     if (missing.length > 0)
@@ -143,7 +144,7 @@ const createLabOrderHandler = async (req, res) => {
 
         try {
             const labOrder = await LabOrder.create({
-                patientId, doctorId, testType, orderDate,
+                patientId, doctorId, testType, testName, orderDate,
                 priority: priority || "Routine",
                 notes
             }, { transaction: t });

@@ -23,6 +23,14 @@ const Patient = sequelize.define("Patient", {
         type: DataTypes.ENUM("Male", "Female", "Other"),
         allowNull: false
     },
+    bloodType: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    emergencyContact: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     contactInformation: {
         type: DataTypes.JSONB,
         allowNull: false,

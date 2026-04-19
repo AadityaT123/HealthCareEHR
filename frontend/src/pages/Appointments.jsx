@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  fetchAppointments, createAppointment, updateAppointment,
+  fetchAppointments, createAppointment, updateAppointment, cancelAppointment,
 } from "../store/slices/appointmentSlice";
 import { fetchPatients } from "../store/slices/patientSlice";
 import { fetchDoctors } from "../store/slices/doctorSlice";
@@ -118,6 +118,10 @@ const Appointments = () => {
       setAddOpen(false); setEditAppt(null);
       setTimeout(() => setSuccess(""), 4000);
     } else { setFormErr(result.payload || "Failed to save appointment."); }
+  };
+
+  const handleDelete = (id) => {
+    dispatch(cancelAppointment(id));
   };
 
   const closePanel = () => { setAddOpen(false); setEditAppt(null); };
@@ -283,6 +287,7 @@ const Appointments = () => {
                     <Td>
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(a)} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
+                        <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
                       </div>
                     </Td>
                   </Tr>

@@ -44,7 +44,7 @@ export const Button = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // Badge
 // ─────────────────────────────────────────────────────────────────────────────
-export const Badge = ({ children, variant = 'default', className = '' }) => {
+export const Badge = ({ children, variant = 'default', className = '', ...props }) => {
   const variants = {
     default: 'bg-primary/10 text-primary',
     success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -55,7 +55,7 @@ export const Badge = ({ children, variant = 'default', className = '' }) => {
     purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   };
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', variants[variant], className)}>
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', variants[variant], className)} {...props}>
       {children}
     </span>
   );

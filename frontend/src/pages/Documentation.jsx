@@ -31,11 +31,30 @@ const NOTE_FORM = {
   subjectiveFindings: '', objectiveFindings: '', assessment: '', plan: ''
 };
 
-const toArray = (res) => { if (Array.isArray(res)) return res; if (Array.isArray(res?.data)) return res.data; return []; };
+const toArray = (res) => { if (Array.isArray(res)) return res; if (Array.isArray(res?.data)) return res.data; if (Array.isArray(res?.items)) return res.items; return []; };
 
 const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
 const FTA = "flex w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 resize-none";
 const LBL = "text-xs font-semibold text-slate-700";
+
+// Panel component shared between both forms
+const FloatingPanel = ({ id, open, onClose, icon: Icon, title, color = '#3b82f6', children }) => {
+  if (!open) return null;
+  return (
+    <div id={id}
+      className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+      style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+      <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: color }}>
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-white" />
+          <h2 className="text-sm font-semibold text-white tracking-wide">{title}</h2>
+        </div>
+        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+      </div>
+      <div className="px-6 py-4 bg-white">{children}</div>
+    </div>
+  );
+};
 
 const Documentation = () => {
   const dispatch = useDispatch();
@@ -131,24 +150,7 @@ const Documentation = () => {
   const filteredEnc = filterList(allEncounters);
   const filteredNote = filterList(allProgressNotes);
 
-  // Panel component shared between both forms
-  const FloatingPanel = ({ id, open, onClose, icon: Icon, title, color = '#3b82f6', children }) => {
-    if (!open) return null;
-    return (
-      <div id={id}
-        className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
-        style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
-        <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: color }}>
-          <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-white" />
-            <h2 className="text-sm font-semibold text-white tracking-wide">{title}</h2>
-          </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="px-6 py-4 bg-white">{children}</div>
-      </div>
-    );
-  };
+
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -353,14 +355,14 @@ const Documentation = () => {
                       action={<Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>} /></CardBody>
                   ) : (
                     <Table>
-                      <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Chief Complaint</Th><Th>Diagnosis</Th><Th>Date</Th><Th>Status</Th></Tr></Thead>
+                      <Thead><Tr><Th>Patient</Th><Th>Chief Complaint</Th><Th>Diagnosis</Th><Th>Plan</Th><Th>Date</Th><Th>Status</Th></Tr></Thead>
                       <Tbody>
                         {filteredEnc.map((enc) => (
                           <Tr key={enc.id}>
                             <Td><span className="font-medium">{getPatientName(enc.patientId)}</span></Td>
-                            <Td><Badge variant="info">{enc.encounterType || enc.type}</Badge></Td>
                             <Td className="max-w-[200px] truncate text-muted-foreground">{enc.chiefComplaint || '—'}</Td>
                             <Td className="max-w-[180px] truncate text-muted-foreground">{enc.diagnosis || '—'}</Td>
+                            <Td className="max-w-[180px] truncate text-muted-foreground">{enc.treatmentPlan || '—'}</Td>
                             <Td className="text-xs text-muted-foreground whitespace-nowrap">{enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}</Td>
                             <Td><Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge></Td>
                           </Tr>
@@ -384,8 +386,8 @@ const Documentation = () => {
                         {filteredNote.map((note) => (
                           <Tr key={note.id}>
                             <Td><span className="font-medium">{getPatientName(note.patientId)}</span></Td>
-                            <Td><Badge variant="purple">{note.noteType || 'SOAP'}</Badge></Td>
-                            <Td className="max-w-[200px] truncate text-muted-foreground">{note.subjective || '—'}</Td>
+                            <Td><Badge className="bg-white border border-purple-200 text-purple-700 shadow-sm">{note.noteType || 'SOAP'}</Badge></Td>
+                            <Td className="max-w-[200px] truncate text-muted-foreground">{note.subjectiveFindings || 'N/A'}</Td>
                             <Td className="max-w-[180px] truncate text-muted-foreground">{note.assessment || '—'}</Td>
                             <Td className="text-xs text-muted-foreground whitespace-nowrap">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy') : '—'}</Td>
                           </Tr>

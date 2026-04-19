@@ -204,18 +204,15 @@ const updateLabOrder = async (req, res) => {
     }
 };
 
-// DELETE /api/lab-orders/:id  (soft cancel)
+// DELETE /api/lab-orders/:id  (hard delete)
 const deleteLabOrder = async (req, res) => {
     try {
         const labOrder = await LabOrder.findByPk(req.params.id);
         if (!labOrder)
             return res.status(404).json({ success: false, message: "Lab order not found" });
 
-        if (labOrder.status === "Completed")
-            return res.status(400).json({ success: false, message: "Cannot cancel a completed lab order" });
-
-        await labOrder.update({ status: "Cancelled" });
-        return res.status(200).json({ success: true, message: "Lab order cancelled successfully" });
+        await labOrder.destroy({ force: true });
+        return res.status(200).json({ success: true, message: "Lab order deleted successfully" });
     } catch (err) {
         console.error("deleteLabOrder error:", err);
         return res.status(500).json({ success: false, message: "Internal server error" });

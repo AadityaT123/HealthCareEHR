@@ -19,6 +19,10 @@ const LabOrder = sequelize.define("LabOrder", {
         type: DataTypes.ENUM("Blood Test", "Urine Test", "ECG", "Biopsy"),
         allowNull: false
     },
+    testName: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     orderDate: {
         type: DataTypes.DATEONLY,
         allowNull: false

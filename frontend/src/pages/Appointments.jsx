@@ -26,10 +26,10 @@ const LBL = "text-xs font-semibold text-slate-700";
 
 // Custom status badge — white bg, coloured text + border, subtle shadow
 const STATUS_STYLE = {
-  Scheduled:  { color: '#3b82f6', border: '#bfdbfe', bg: '#ffffff' },
-  Completed:  { color: '#16a34a', border: '#bbf7d0', bg: '#ffffff' },
-  Cancelled:  { color: '#dc2626', border: '#fecaca', bg: '#ffffff' },
-  'No-Show':  { color: '#d97706', border: '#fde68a', bg: '#ffffff' },
+  Scheduled: { color: '#3b82f6', border: '#bfdbfe', bg: '#ffffff' },
+  Completed: { color: '#16a34a', border: '#bbf7d0', bg: '#ffffff' },
+  Cancelled: { color: '#dc2626', border: '#fecaca', bg: '#ffffff' },
+  'No-Show': { color: '#d97706', border: '#fde68a', bg: '#ffffff' },
 };
 
 const ApptStatusBadge = ({ status }) => {
@@ -95,13 +95,13 @@ const Appointments = () => {
 
   const buildPayload = () => ({
     patientId: Number(form.patientId),
-    doctorId:  Number(form.doctorId),
+    doctorId: Number(form.doctorId),
     appointmentDate: form.appointmentTime
       ? `${form.appointmentDate}T${form.appointmentTime}:00`
       : `${form.appointmentDate}T08:00:00`,
     appointmentType: form.appointmentType,
     status: form.status,
-    notes:  form.notes,
+    notes: form.notes,
     reason: form.notes || '',   // backend validator expects 'reason'
   });
 
@@ -118,6 +118,10 @@ const Appointments = () => {
       setAddOpen(false); setEditAppt(null);
       setTimeout(() => setSuccess(""), 4000);
     } else { setFormErr(result.payload || "Failed to save appointment."); }
+  };
+
+  const handleDelete = (id) => {
+    dispatch(cancelAppointment(id));
   };
 
   const closePanel = () => { setAddOpen(false); setEditAppt(null); };
@@ -148,12 +152,12 @@ const Appointments = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by patient name or notes…"
+                  placeholder="Search by patient name"
                   className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
               </div>
               <select value={statusFlt} onChange={(e) => setStatusFlt(e.target.value)}
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <option value="">All Statuses</option>
+                <option value="">Status</option>
                 {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
               </select>
             </div>
@@ -283,9 +287,7 @@ const Appointments = () => {
                     <Td>
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(a)} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
-                        {a.status !== "Cancelled" && (
-                          <button onClick={() => dispatch(cancelAppointment(a.id))} className="px-2 py-1 text-xs rounded-md border border-destructive/30 text-destructive hover:bg-destructive/10 transition-colors">Cancel</button>
-                        )}
+                        <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
                       </div>
                     </Td>
                   </Tr>

@@ -21,7 +21,7 @@ const ImagingOrder = sequelize.define("ImagingOrder", {
         allowNull: true
     },
     imagingType: {
-        type: DataTypes.ENUM("X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography"),
+        type: DataTypes.ENUM("X-Ray", "MRI", "CT Scan", "Ultrasound", "PET Scan", "Mammography", "Echocardiogram"),
         allowNull: false
     },
     bodyPart: {
@@ -33,7 +33,7 @@ const ImagingOrder = sequelize.define("ImagingOrder", {
         defaultValue: "Routine"
     },
     status: {
-        type: DataTypes.ENUM("Ordered", "Scheduled", "In Progress", "Completed", "Cancelled"),
+        type: DataTypes.ENUM("Ordered", "Scheduled", "In Progress", "Completed", "Cancelled", "Rejected"),
         defaultValue: "Ordered"
     },
     clinicalReason: {

@@ -21,6 +21,10 @@ const InfoRow = ({ label, value }) => (
   </div>
 );
 
+const LBL = "text-xs font-semibold text-slate-700";
+const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
+
+
 const PatientDetail = () => {
   const { id }    = useParams();
   const navigate  = useNavigate();
@@ -64,7 +68,9 @@ const PatientDetail = () => {
       lastName:  currentPatient?.lastName  || '',
       gender:    currentPatient?.gender    || '',
       bloodType: currentPatient?.bloodType || '',
+      emergencyContact: currentPatient?.emergencyContact || '',
       contactInformation: { ...currentPatient?.contactInformation },
+      insuranceDetails: { ...currentPatient?.insuranceDetails },
     });
     setEditOpen(true);
   };
@@ -100,7 +106,7 @@ const PatientDetail = () => {
   const age = calcAge(p.dateOfBirth);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in relative">
 
       {/* Back */}
       <button onClick={() => navigate('/patients')} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
@@ -119,7 +125,11 @@ const PatientDetail = () => {
               <span>MRN: <span className="font-mono text-foreground">{String(p.id).padStart(8, '0')}</span></span>
               {age !== null && <span>Age: <span className="font-medium text-foreground">{age} yrs</span></span>}
               <span>Gender: <span className="font-medium text-foreground">{p.gender || '—'}</span></span>
-              {p.bloodType && <Badge variant="info">{p.bloodType}</Badge>}
+              {p.bloodType && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-white border border-slate-200 text-[#3b82f6] shadow-sm ml-1">
+                  {p.bloodType}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -158,9 +168,20 @@ const PatientDetail = () => {
               <CardBody>
                 <dl>
                   <InfoRow label="Date of Birth" value={p.dateOfBirth ? format(new Date(p.dateOfBirth), 'MMMM dd, yyyy') : null} />
-                  <InfoRow label="Blood Type"    value={p.bloodType} />
+                  <InfoRow label="Blood Type"    value={p.bloodType ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-white border border-slate-200 text-[#3b82f6] shadow-sm">
+                      {p.bloodType}
+                    </span>
+                  ) : null} />
                   <InfoRow label="Emergency Contact" value={p.emergencyContact} />
-                  <InfoRow label="Insurance"     value={p.insuranceDetails?.provider} />
+                  <div className="py-2 mt-2 border-t border-border/50">
+                    <p className="text-sm font-semibold text-slate-700 mb-2">Insurance Information</p>
+                    <div className="space-y-1">
+                      <InfoRow label="Provider"  value={p.insuranceDetails?.provider} />
+                      <InfoRow label="Policy No" value={p.insuranceDetails?.policyNumber} />
+                      <InfoRow label="Group No"  value={p.insuranceDetails?.groupNumber} />
+                    </div>
+                  </div>
                 </dl>
               </CardBody>
             </Card>
@@ -332,32 +353,106 @@ const PatientDetail = () => {
         </TabPanel>
       </Tabs>
 
-      {/* Edit Modal */}
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Patient Profile">
-        <form onSubmit={handleEdit} className="space-y-4">
-          {editErr && <Alert variant="error">{editErr}</Alert>}
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" required value={editForm.firstName || ''}
-              onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} />
-            <Input label="Last Name" required value={editForm.lastName || ''}
-              onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} />
+      {/* Click-away dimmer */}
+      {editOpen && (
+        <div className="absolute inset-0 z-20" onClick={() => setEditOpen(false)} />
+      )}
+
+      {/* Floating Edit Panel */}
+      {editOpen && (
+        <div id="edit-patient-panel"
+          className="absolute left-1/2 -translate-x-1/2 w-full max-w-2xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+          style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+          <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-white" />
+              <h2 className="text-sm font-semibold text-white tracking-wide">Edit Patient Profile</h2>
+            </div>
+            <button onClick={() => setEditOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors">
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <Select label="Gender" value={editForm.gender || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, gender: e.target.value }))}>
-            <option value="">Select gender</option>
-            <option>Male</option><option>Female</option><option>Other</option>
-          </Select>
-          <Input label="Phone" value={editForm.contactInformation?.phone || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, phone: e.target.value } }))} />
-          <Input label="Email" type="email" value={editForm.contactInformation?.email || ''}
-            onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, email: e.target.value } }))} />
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" type="button" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button type="submit">Save Changes</Button>
+          
+          <div className="px-6 py-4 bg-white">
+            <form onSubmit={handleEdit} className="space-y-4">
+              {editErr && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs">
+                  <span className="font-semibold">Error:</span> {editErr}
+                </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className={LBL}>First Name <span className="text-red-500">*</span></label>
+                  <input required value={editForm.firstName || ''} onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} className={F} />
+                </div>
+                <div className="space-y-1">
+                  <label className={LBL}>Last Name <span className="text-red-500">*</span></label>
+                  <input required value={editForm.lastName || ''} onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} className={F} />
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <label className={LBL}>Gender</label>
+                <select value={editForm.gender || ''} onChange={(e) => setEditForm((f) => ({ ...f, gender: e.target.value }))} className={F}>
+                  <option value="">Select gender</option>
+                  <option>Male</option><option>Female</option><option>Other</option>
+                </select>
+              </div>
+              
+              <div className="space-y-1">
+                <label className={LBL}>Phone</label>
+                <input value={editForm.contactInformation?.phone || ''} onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, phone: e.target.value } }))} className={F} />
+              </div>
+              
+              <div className="space-y-1">
+                <label className={LBL}>Email</label>
+                <input type="email" value={editForm.contactInformation?.email || ''} onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, email: e.target.value } }))} className={F} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className={LBL}>Blood Type</label>
+                  <select value={editForm.bloodType || ''} onChange={(e) => setEditForm((f) => ({ ...f, bloodType: e.target.value }))} className={F}>
+                    <option value="">Unknown</option>
+                    <option value="A+">A+</option><option value="A-">A-</option>
+                    <option value="B+">B+</option><option value="B-">B-</option>
+                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                    <option value="O+">O+</option><option value="O-">O-</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className={LBL}>Emergency Contact</label>
+                  <input type="tel" placeholder="Name / Phone" value={editForm.emergencyContact || ''} onChange={(e) => setEditForm((f) => ({ ...f, emergencyContact: e.target.value }))} className={F} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className={LBL}>Insurance Provider (Optional)</label>
+                <input placeholder="e.g. Blue Cross Blue Shield" value={editForm.insuranceDetails?.provider || ''} onChange={(e) => setEditForm((f) => ({ ...f, insuranceDetails: { ...f.insuranceDetails, provider: e.target.value } }))} className={F} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className={LBL}>Policy Number</label>
+                  <input placeholder="Policy ID" value={editForm.insuranceDetails?.policyNumber || ''} onChange={(e) => setEditForm((f) => ({ ...f, insuranceDetails: { ...f.insuranceDetails, policyNumber: e.target.value } }))} className={F} />
+                </div>
+                <div className="space-y-1">
+                  <label className={LBL}>Group Number</label>
+                  <input placeholder="Group ID" value={editForm.insuranceDetails?.groupNumber || ''} onChange={(e) => setEditForm((f) => ({ ...f, insuranceDetails: { ...f.insuranceDetails, groupNumber: e.target.value } }))} className={F} />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" type="button" onClick={() => setEditOpen(false)}>Cancel</Button>
+                <Button type="submit" style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}>Save Changes</Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
+
   );
 };
 

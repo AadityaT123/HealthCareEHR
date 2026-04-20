@@ -44,7 +44,7 @@ export const Button = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // Badge
 // ─────────────────────────────────────────────────────────────────────────────
-export const Badge = ({ children, variant = 'default', className = '' }) => {
+export const Badge = ({ children, variant = 'default', className = '', ...props }) => {
   const variants = {
     default: 'bg-primary/10 text-primary',
     success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -55,7 +55,7 @@ export const Badge = ({ children, variant = 'default', className = '' }) => {
     purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   };
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', variants[variant], className)}>
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold', variants[variant], className)} {...props}>
       {children}
     </span>
   );
@@ -99,7 +99,7 @@ export const PageHeader = ({ title, subtitle, action, className = '' }) => (
 // Alert
 // ─────────────────────────────────────────────────────────────────────────────
 const alertStyles = {
-  success: { icon: CheckCircle2, cls: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300' },
+  success: { icon: CheckCircle2, cls: 'bg-white border-emerald-500 text-emerald-600 shadow-sm' },
   error: { icon: AlertCircle, cls: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300' },
   warning: { icon: AlertTriangle, cls: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300' },
   info: { icon: Info, cls: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' },

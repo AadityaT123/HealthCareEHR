@@ -31,11 +31,13 @@ const PatientDetail = () => {
   const dispatch = useDispatch();
 
   const { currentPatient, loading, error } = useSelector((s) => s.patients);
+  const { user } = useSelector((s) => s.auth);
   const {
     encounters = [],
     progressNotes = [],
     loading: cLoading,
   } = useSelector((s) => s.clinical);
+  const isAdmin = user?.roleName?.toLowerCase() === 'admin';
   const {
     labOrders = [],
     imagingOrders = [],
@@ -144,9 +146,11 @@ const PatientDetail = () => {
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={openEdit}>
-          <Edit className="h-4 w-4" /> Edit Profile
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" onClick={openEdit}>
+            <Edit className="h-4 w-4" /> Edit Profile
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}

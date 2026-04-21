@@ -368,7 +368,9 @@ export const TabPanel = ({ id, children }) => {
 // ─────────────────────────────────────────────────────────────────────────────
 export const statusVariant = (status = '') => {
   const s = status.toLowerCase();
-  if (['active', 'completed', 'filled', 'resulted', 'administered', 'verified'].includes(s)) return 'success';
+  if (['active'].includes(s)) return 'info'; // Blue
+  if (['upcoming'].includes(s)) return 'danger'; // Red
+  if (['completed', 'filled', 'resulted', 'administered', 'verified'].includes(s)) return 'success'; // Green
   if (['pending', 'ordered', 'scheduled', 'processing'].includes(s)) return 'info';
   if (['cancelled', 'discontinued', 'rejected', 'missed'].includes(s)) return 'danger';
   if (['on hold', 'in progress', 'partial'].includes(s)) return 'warning';

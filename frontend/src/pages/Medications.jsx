@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchAllMedications, fetchAllPrescriptions, createPrescription } from '../store/slices/medicationsSlice';
+import { fetchAllMedications, fetchAllPrescriptions, createPrescription, updatePrescription } from '../store/slices/medicationsSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
-import { Pill, Plus, Search, X } from 'lucide-react';
+import { Pill, Plus, Search, X, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Every 6 hours', 'Every 8 hours', 'Every 12 hours', 'As needed (PRN)', 'Weekly', 'Monthly'];
 const DURATIONS = ['3 days', '5 days', '7 days', '10 days', '14 days', '30 days', '60 days', '90 days', 'Ongoing'];
+const PAGE_SIZE = 12;
 
 const RX_FORM = {
   patientId: '', doctorId: '', medicationId: '',
@@ -31,10 +32,14 @@ const Medications = () => {
   const { list: doctors } = useSelector((s) => s.doctors);
 
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [rxOpen, setRxOpen] = useState(false);
   const [rxForm, setRxForm] = useState(RX_FORM);
   const [formErr, setFormErr] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [editRxOpen, setEditRxOpen] = useState(false);
+  const [editRxForm, setEditRxForm] = useState(null);
 
   useEffect(() => {
     dispatch(fetchAllMedications());
@@ -52,6 +57,9 @@ const Medications = () => {
     const medName = (rx.Medication?.medicationName || rx.medicationName || '').toLowerCase();
     return !search || patName.includes(search.toLowerCase()) || medName.includes(search.toLowerCase());
   });
+
+  const totalPagesRx = Math.max(1, Math.ceil(filterRx.length / PAGE_SIZE));
+  const paginatedRx = filterRx.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const handleRxSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
@@ -97,14 +105,14 @@ const Medications = () => {
           <CardBody className="py-3">
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medications, patients…"
+              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search medications, patients…"
                 className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
             </div>
           </CardBody>
         </Card>
 
         {/* Click-away dimmer */}
-        {rxOpen && <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => setRxOpen(false)} />}
+        {(rxOpen || editRxOpen) && <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setRxOpen(false); setEditRxOpen(false); }} />}
 
         {/* New Prescription Floating Panel */}
         {rxOpen && (
@@ -211,6 +219,47 @@ const Medications = () => {
           </div>
         )}
 
+        {/* Edit Prescription Status Panel */}
+        {editRxOpen && editRxForm && (
+          <div id="edit-rx-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-xs z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '150px', animation: 'slideDown 0.18s ease-out' }}>
+            <div className="flex items-center justify-between px-5 py-3" style={{ backgroundColor: '#3b82f6' }}>
+              <div className="flex items-center gap-2">
+                <Edit className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white">Update Status</h2>
+              </div>
+              <button onClick={() => setEditRxOpen(false)} className="text-white/80 hover:text-white"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-5 py-4 bg-white space-y-4">
+              {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+              <div className="space-y-1">
+                <label className={LBL}>Current Status</label>
+                <select value={editRxForm.status} onChange={(e) => setEditRxForm(f => ({ ...f, status: e.target.value }))} className={F}>
+                  <option value="Active">Active</option>
+                  <option value="Upcoming">Upcoming</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={() => setEditRxOpen(false)} className="h-8 px-4 rounded-md border border-slate-300 text-xs text-slate-700">Cancel</button>
+                <button onClick={async () => {
+                  setFormErr('');
+                  const res = await dispatch(updatePrescription({ id: editRxForm.id, data: { status: editRxForm.status } }));
+                  if (updatePrescription.fulfilled.match(res)) {
+                    setSuccess('Prescription status updated.');
+                    setEditRxOpen(false);
+                    setTimeout(() => setSuccess(''), 4000);
+                  } else {
+                    setFormErr(res.payload || 'Failed to update status.');
+                  }
+                }} disabled={saving} className="h-8 px-5 rounded-md text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600">Save</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs + Tables */}
         <div className="mt-4">
           <Tabs defaultTab="prescriptions">
@@ -224,22 +273,58 @@ const Medications = () => {
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : filterRx.length === 0
                     ? <CardBody><EmptyState icon={Pill} title="No prescriptions" description="Issue the first prescription." action={<Button onClick={openRx}><Plus className="h-4 w-4" /> New Prescription</Button>} /></CardBody>
-                    : <Table>
-                      <Thead><Tr><Th>Patient</Th><Th>Medication</Th><Th>Dosage</Th><Th>Frequency</Th><Th>Duration</Th><Th>Prescribed By</Th><Th>Status</Th></Tr></Thead>
-                      <Tbody>
-                        {filterRx.map((rx) => (
-                          <Tr key={rx.id}>
-                            <Td><span className="font-medium">{getPatientName(rx.patientId)}</span></Td>
-                            <Td>{rx.Medication?.medicationName || rx.medicationName || '—'}</Td>
-                            <Td className="font-mono text-sm">{rx.dosage || '—'}</Td>
-                            <Td className="text-muted-foreground">{rx.frequency || '—'}</Td>
-                            <Td className="text-muted-foreground">{rx.duration || '—'}</Td>
-                            <Td className="text-muted-foreground">{getDoctorName(rx.doctorId)}</Td>
-                            <Td><Badge variant={statusVariant(rx.status)}>{rx.status || 'Active'}</Badge></Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>}
+                    : <>
+                      <Table>
+                        <Thead><Tr><Th>Patient</Th><Th>Medication</Th><Th>Dosage</Th><Th>Frequency</Th><Th>Duration</Th><Th>Prescribed By</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
+                        <Tbody>
+                          {paginatedRx.map((rx) => (
+                            <Tr key={rx.id}>
+                              <Td><span className="font-medium">{getPatientName(rx.patientId)}</span></Td>
+                              <Td>{rx.Medication?.medicationName || rx.medicationName || '—'}</Td>
+                              <Td className="font-mono text-sm">{rx.dosage || '—'}</Td>
+                              <Td className="text-muted-foreground">{rx.frequency || '—'}</Td>
+                              <Td className="text-muted-foreground">{rx.duration || '—'}</Td>
+                              <Td className="text-muted-foreground">{getDoctorName(rx.doctorId)}</Td>
+                              <Td><Badge variant={statusVariant(rx.status)} className="!bg-white shadow-sm">{rx.status || 'Active'}</Badge></Td>
+                              <Td>
+                                {['active', 'upcoming', 'completed'].includes((rx.status || 'Active').toLowerCase()) ? (
+                                  <button
+                                    onClick={() => { setFormErr(''); setEditRxForm({ id: rx.id, status: rx.status || 'Active' }); setEditRxOpen(true); }}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-medium text-xs">
+                                    <Edit className="h-3.5 w-3.5" /> Edit
+                                  </button>
+                                ) : <span className="text-muted-foreground">—</span>}
+                              </Td>
+                            </Tr>
+                          ))}
+                        </Tbody>
+                      </Table>
+                      {totalPagesRx > 1 && (
+                        <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filterRx.length)} of {filterRx.length}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setPage((p) => Math.max(1, p - 1))}
+                              disabled={page === 1}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <span className="text-sm text-foreground px-2">{page} / {totalPagesRx}</span>
+                            <button
+                              onClick={() => setPage((p) => Math.min(totalPagesRx, p + 1))}
+                              disabled={page === totalPagesRx}
+                              className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                }
               </Card>
             </TabPanel>
 
@@ -254,7 +339,7 @@ const Medications = () => {
                         {filterCatalog.map((m) => (
                           <Tr key={m.id}>
                             <Td><span className="font-medium">{m.medicationName || m.name}</span></Td>
-                            <Td><Badge variant="info">{m.category || '—'}</Badge></Td>
+                            <Td><Badge variant="info" className="!bg-white shadow-sm">{m.category || '—'}</Badge></Td>
                             <Td className="font-mono text-xs">{m.dosage || '—'}</Td>
                             <Td className="text-muted-foreground text-xs max-w-[260px] truncate">{m.instructions || '—'}</Td>
                           </Tr>

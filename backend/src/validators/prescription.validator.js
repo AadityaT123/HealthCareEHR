@@ -13,5 +13,5 @@ export const createPrescriptionV = Joi.object({
 });
 
 export const updatePrescriptionV = Joi.object({
-    status: Joi.string().valid("Active", "Completed", "Cancelled").required()
+    status: Joi.string().valid("Active", "Completed", "Cancelled", "Upcoming").required()
 });

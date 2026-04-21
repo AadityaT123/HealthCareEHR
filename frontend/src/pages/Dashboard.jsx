@@ -13,8 +13,9 @@ import { Card, CardBody, CardHeader, Spinner, Badge, statusVariant } from '../co
 import { format, isToday, parseISO } from 'date-fns';
 
 const toArray = (res) => {
-  if (Array.isArray(res))       return res;
+  if (Array.isArray(res)) return res;
   if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.items)) return res.items;
   return [];
 };
 
@@ -67,12 +68,12 @@ const Dashboard = () => {
   useEffect(() => {
     dispatch(fetchPatients());
     dispatch(fetchAppointments());
-    labOrderService.getAll()
+    labOrderService.getAll({ limit: 1000 })
       .then((res) => dispatch(setAllLabOrders(toArray(res))))
-      .catch(() => {});
-    imagingOrderService.getAll()
+      .catch(() => { });
+    imagingOrderService.getAll({ limit: 1000 })
       .then((res) => dispatch(setAllImagingOrders(toArray(res))))
-      .catch(() => {});
+      .catch(() => { });
   }, [dispatch]);
 
   // Today's appointments
@@ -94,6 +95,25 @@ const Dashboard = () => {
     return 'Good evening';
   };
 
+  const getPatientName = (pid) => {
+    const p = patients.find((pt) => String(pt.id) === String(pid));
+    return p ? `${p.firstName} ${p.lastName}` : `Patient #${pid}`;
+  };
+
+  const formatApptTime = (s) => {
+    if (!s || !s.includes('T')) return '';
+    try {
+      return format(parseISO(s), 'h:mm a');
+    } catch {
+      return '';
+    }
+  };
+
+  const activeOrdersCount = [
+    ...allLabOrders,
+    ...allImagingOrders
+  ].filter((o) => (o.status || '').toLowerCase() !== 'completed').length;
+
   return (
     <div className="space-y-8 animate-fade-in">
 
@@ -108,33 +128,35 @@ const Dashboard = () => {
           <h1 className="text-2xl md:text-3xl font-bold">
             {greeting()}, {user?.username || 'Doctor'} 👋
           </h1>
-          <p className="mt-2 text-blue-100 text-sm max-w-lg">
-            Here's your clinical overview. You have{' '}
-            <span className="font-semibold text-white">{todayAppts.length}</span>{' '}
-            appointment{todayAppts.length !== 1 ? 's' : ''} scheduled for today.
-          </p>
+          {user?.roleName?.toLowerCase() !== 'admin' && (
+            <p className="mt-2 text-blue-100 text-sm max-w-lg">
+              Here's your clinical overview. You have{' '}
+              <span className="font-semibold text-white">{todayAppts.length}</span>{' '}
+              appointment{todayAppts.length !== 1 ? 's' : ''} scheduled for today.
+            </p>
+          )}
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Total Patients"   value={patients.length}  icon={Users}
+          label="Total Patients" value={patients.length} icon={Users}
           gradient="linear-gradient(135deg, #3b82f6, #2563eb)"
-          loading={pLoading}       onClick={() => navigate('/patients')}
+          loading={pLoading} onClick={() => navigate('/patients')}
         />
         <StatCard
           label="Today's Appointments" value={todayAppts.length} icon={CalendarDays}
           gradient="linear-gradient(135deg, #8b5cf6, #7c3aed)"
-          loading={aLoading}       onClick={() => navigate('/appointments')}
+          loading={aLoading} onClick={() => navigate('/appointments')}
         />
         <StatCard
           label="Scheduled (Pending)" value={pendingAppts} icon={Clock}
           gradient="linear-gradient(135deg, #f59e0b, #d97706)"
-          loading={aLoading}       onClick={() => navigate('/appointments')}
+          loading={aLoading} onClick={() => navigate('/appointments')}
         />
         <StatCard
-          label="Lab & Imaging Orders" value={allLabOrders.length + allImagingOrders.length} icon={FlaskConical}
+          label="Lab & Imaging Orders" value={activeOrdersCount} icon={FlaskConical}
           gradient="linear-gradient(135deg, #10b981, #059669)"
           onClick={() => navigate('/orders')}
         />
@@ -211,36 +233,36 @@ const Dashboard = () => {
                 <div className="divide-y divide-border">
                   {todayAppts.slice(0, 6).map((a) => (
                     <div key={a.id} className="px-5 py-3 flex items-center gap-3">
-                      <div className="text-xs text-muted-foreground w-14 flex-shrink-0 font-mono">
-                        {a.appointmentTime || a.time || '--:--'}
+                      <div className="text-xs text-muted-foreground w-14 flex-shrink-0 font-semibold" style={{ fontFamily: "'Calibri', 'Segoe UI', sans-serif" }}>
+                        {formatApptTime(a.appointmentDate || a.date)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">
-                          {a.patientName || `Patient #${a.patientId}`}
+                          {a.patientName || getPatientName(a.patientId)}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{a.reason || a.type || 'Appointment'}</p>
                       </div>
-                      <Badge variant={statusVariant(a.status)}>{a.status || 'Scheduled'}</Badge>
+                      <Badge variant={statusVariant(a.status)} className="!bg-white shadow-sm font-semibold">{a.status || 'Scheduled'}</Badge>
                     </div>
                   ))}
                 </div>
               )}
             </CardBody>
           </Card>
-        </div>
-      </div>
+        </div >
+      </div >
 
       {/* Quick Actions */}
-      <div>
+      < div >
         <h2 className="text-base font-semibold text-foreground mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <QuickAction label="Patients"      icon={Users}        onClick={() => navigate('/patients')}     color="border-blue-200   bg-blue-50   text-blue-700   hover:bg-blue-100" />
-          <QuickAction label="Appointments"  icon={CalendarDays} onClick={() => navigate('/appointments')} color="border-purple-200  bg-purple-50  text-purple-700  hover:bg-purple-100" />
-          <QuickAction label="Lab Orders"    icon={FlaskConical} onClick={() => navigate('/orders')}       color="border-green-200  bg-green-50  text-green-700   hover:bg-green-100" />
-          <QuickAction label="Prescriptions" icon={Pill}         onClick={() => navigate('/medications')}  color="border-amber-200  bg-amber-50  text-amber-700   hover:bg-amber-100" />
+          <QuickAction label="Patients" icon={Users} onClick={() => navigate('/patients')} color="border-blue-200   bg-blue-50   text-blue-700   hover:bg-blue-100" />
+          <QuickAction label="Appointments" icon={CalendarDays} onClick={() => navigate('/appointments')} color="border-purple-200  bg-purple-50  text-purple-700  hover:bg-purple-100" />
+          <QuickAction label="Lab Orders" icon={FlaskConical} onClick={() => navigate('/orders')} color="border-green-200  bg-green-50  text-green-700   hover:bg-green-100" />
+          <QuickAction label="Prescriptions" icon={Pill} onClick={() => navigate('/medications')} color="border-amber-200  bg-amber-50  text-amber-700   hover:bg-amber-100" />
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

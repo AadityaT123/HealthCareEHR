@@ -21,7 +21,9 @@ export const fetchPrescriptionsByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await prescriptionService.getByPatient(patientId);
-      return res.data ?? res;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      // axiosClient already unwraps response.data, so res IS that object
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch prescriptions');
     }
@@ -30,7 +32,7 @@ export const fetchPrescriptionsByPatient = createAsyncThunk(
 
 export const fetchAllPrescriptions = createAsyncThunk(
   'medications/fetchAllPrescriptions',
-  async (params, { rejectWithValue }) => {
+  async (params = { limit: 1000 }, { rejectWithValue }) => {
     try {
       const res = await prescriptionService.getAll(params);
       // Backend returns paginated: { success, totalItems, items: [...], totalPages, currentPage }
@@ -55,6 +57,20 @@ export const createPrescription = createAsyncThunk(
   }
 );
 
+export const updatePrescription = createAsyncThunk(
+  'medications/updatePrescription',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await prescriptionService.update(id, data);
+      return res.data ?? res;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || err.message || 'Failed to update prescription'
+      );
+    }
+  }
+);
+
 // ── MAR Thunks ───────────────────────────────────────────────────────────────
 export const fetchMARByPatient = createAsyncThunk(
   'medications/fetchMAR',
@@ -71,17 +87,23 @@ export const fetchMARByPatient = createAsyncThunk(
 const medicationsSlice = createSlice({
   name: 'medications',
   initialState: {
-    catalog: [],       // Full medication catalog
-    prescriptions: [], // All / patient prescriptions
-    mar: [],           // Medication administration records
+    catalog: [],            // Full medication catalog
+    prescriptions: [],      // Global list — all prescriptions (Medications.jsx)
+    patientPrescriptions: [], // Patient-scoped list (PatientDetail.jsx)
+    mar: [],                // Medication administration records
     loading: false,
-    saving: false,     // Tracks createPrescription in-flight state
+    saving: false,          // Tracks createPrescription in-flight state
     error: null,
   },
   reducers: {
     clearMedicationData: (state) => {
       state.prescriptions = [];
+      state.patientPrescriptions = [];
       state.mar = [];
+      state.error = null;
+    },
+    clearPatientPrescriptions: (state) => {
+      state.patientPrescriptions = [];
       state.error = null;
     },
     // Allows Medications.jsx to bulk-set all prescriptions fetched via direct service call
@@ -104,13 +126,15 @@ const medicationsSlice = createSlice({
       .addCase(fetchPrescriptionsByPatient.pending,   setPending)
       .addCase(fetchPrescriptionsByPatient.fulfilled, (state, action) => {
         state.loading = false;
-        state.prescriptions = Array.isArray(action.payload) ? action.payload : [];
+        // Write to patient-scoped key — does NOT touch the global prescriptions list
+        state.patientPrescriptions = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchPrescriptionsByPatient.rejected,  setRejected)
 
       .addCase(fetchAllPrescriptions.pending,   setPending)
       .addCase(fetchAllPrescriptions.fulfilled, (state, action) => {
         state.loading = false;
+        // Write to global list only
         state.prescriptions = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchAllPrescriptions.rejected,  setRejected)
@@ -118,11 +142,27 @@ const medicationsSlice = createSlice({
       .addCase(createPrescription.pending,   (state) => { state.saving = true; state.error = null; })
       .addCase(createPrescription.fulfilled, (state, action) => {
         state.saving = false;
-        if (action.payload) state.prescriptions.unshift(action.payload);
+        if (action.payload) {
+          // Prepend to global list (Medications.jsx)
+          state.prescriptions.unshift(action.payload);
+          // Also prepend to patient-scoped list for immediate reflection in PatientDetail
+          state.patientPrescriptions.unshift(action.payload);
+        }
       })
       .addCase(createPrescription.rejected,  (state, action) => {
         state.saving = false;
         state.error = action.payload;
+      })
+
+      .addCase(updatePrescription.fulfilled, (state, action) => {
+        if (action.payload) {
+          // Remove from current position and unshift to top to match 'updatedAt' sorting
+          state.prescriptions = state.prescriptions.filter((rx) => rx.id !== action.payload.id);
+          state.prescriptions.unshift(action.payload);
+
+          const idxPatient = state.patientPrescriptions.findIndex((rx) => rx.id === action.payload.id);
+          if (idxPatient !== -1) state.patientPrescriptions[idxPatient] = action.payload;
+        }
       })
 
       .addCase(fetchMARByPatient.pending,   setPending)
@@ -134,5 +174,5 @@ const medicationsSlice = createSlice({
   },
 });
 
-export const { clearMedicationData, setAllPrescriptions } = medicationsSlice.actions;
+export const { clearMedicationData, clearPatientPrescriptions, setAllPrescriptions } = medicationsSlice.actions;
 export default medicationsSlice.reducer;

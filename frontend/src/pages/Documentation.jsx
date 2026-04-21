@@ -60,7 +60,7 @@ const Documentation = () => {
   const dispatch = useDispatch();
   const { allEncounters, allProgressNotes, loading, error } = useSelector((s) => s.clinical);
   const { list: patients } = useSelector((s) => s.patients);
-  const { list: doctors }  = useSelector((s) => s.doctors);
+  const { list: doctors } = useSelector((s) => s.doctors);
   const { list: appointments } = useSelector((s) => s.appointments);
   // Get the logged-in doctor's ID (if the user is a doctor)
   const authUser = useSelector((s) => s.auth?.user);
@@ -100,19 +100,19 @@ const Documentation = () => {
 
   const handleEncSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
-    if (!encForm.patientId)   { setFormErr('Patient is required.'); return; }
-    if (!encForm.doctorId)    { setFormErr('Doctor is required.'); return; }
+    if (!encForm.patientId) { setFormErr('Patient is required.'); return; }
+    if (!encForm.doctorId) { setFormErr('Doctor is required.'); return; }
     if (!encForm.appointmentId) { setFormErr('Appointment is required (encounters must be linked to an appointment).'); return; }
     if (!encForm.chiefComplaint) { setFormErr('Chief complaint is required.'); return; }
     const payload = {
-      patientId:      Number(encForm.patientId),
-      doctorId:       Number(encForm.doctorId),
-      appointmentId:  Number(encForm.appointmentId),
-      encounterDate:  encForm.encounterDate || new Date().toISOString(),
+      patientId: Number(encForm.patientId),
+      doctorId: Number(encForm.doctorId),
+      appointmentId: Number(encForm.appointmentId),
+      encounterDate: encForm.encounterDate || new Date().toISOString(),
       chiefComplaint: encForm.chiefComplaint,
-      diagnosis:      encForm.diagnosis || 'Pending',
-      treatmentPlan:  encForm.treatmentPlan || 'To be determined',
-      notes:          encForm.notes || '',
+      diagnosis: encForm.diagnosis || 'Pending',
+      treatmentPlan: encForm.treatmentPlan || 'To be determined',
+      notes: encForm.notes || '',
     };
     const result = await dispatch(createEncounter(payload));
     if (createEncounter.fulfilled.match(result)) {
@@ -123,19 +123,19 @@ const Documentation = () => {
 
   const handleNoteSubmit = async (e) => {
     e.preventDefault(); setFormErr('');
-    if (!noteForm.patientId)  { setFormErr('Patient is required.'); return; }
-    if (!noteForm.doctorId)   { setFormErr('Doctor is required.'); return; }
+    if (!noteForm.patientId) { setFormErr('Patient is required.'); return; }
+    if (!noteForm.doctorId) { setFormErr('Doctor is required.'); return; }
     if (!noteForm.assessment) { setFormErr('Assessment is required.'); return; }
-    if (!noteForm.plan)       { setFormErr('Plan is required.'); return; }
+    if (!noteForm.plan) { setFormErr('Plan is required.'); return; }
     const payload = {
-      patientId:          Number(noteForm.patientId),
-      doctorId:           Number(noteForm.doctorId),
-      noteDate:           noteForm.noteDate || new Date().toISOString().split('T')[0],
-      noteType:           noteForm.noteType || 'SOAP',
+      patientId: Number(noteForm.patientId),
+      doctorId: Number(noteForm.doctorId),
+      noteDate: noteForm.noteDate || new Date().toISOString().split('T')[0],
+      noteType: noteForm.noteType || 'SOAP',
       subjectiveFindings: noteForm.subjectiveFindings || '',
-      objectiveFindings:  noteForm.objectiveFindings  || '',
-      assessment:         noteForm.assessment,
-      plan:               noteForm.plan,
+      objectiveFindings: noteForm.objectiveFindings || '',
+      assessment: noteForm.assessment,
+      plan: noteForm.plan,
     };
     const result = await dispatch(createProgressNote(payload));
     if (createProgressNote.fulfilled.match(result)) {
@@ -364,7 +364,7 @@ const Documentation = () => {
                             <Td className="max-w-[180px] truncate text-muted-foreground">{enc.diagnosis || '—'}</Td>
                             <Td className="max-w-[180px] truncate text-muted-foreground">{enc.treatmentPlan || '—'}</Td>
                             <Td className="text-xs text-muted-foreground whitespace-nowrap">{enc.createdAt ? format(new Date(enc.createdAt), 'MMM dd, yyyy') : '—'}</Td>
-                            <Td><Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge></Td>
+                            <Td><Badge variant={statusVariant(enc.status)} className="text-emerald-500 font-semibold shadow-sm">{enc.status || 'Completed'}</Badge></Td>
                           </Tr>
                         ))}
                       </Tbody>

@@ -1,24 +1,15 @@
-Write-Host "Staging all frontend RBAC UI changes..." -ForegroundColor Blue
+Write-Host "Staging new credential seed file..." -ForegroundColor Blue
 git add .
-
-Write-Host "Committing changes..." -ForegroundColor Blue
-git commit -m "feat: complete strict role-based access control (RBAC) UI constraints
-
-- Applied patient data edit restrictions and added Admin patient login creation
-- Locked doctor side appointment booking/editing with unauthorized popup alerts 
-- Removed 'New Encounter' and 'Progress Note' creation buttons for Doctors
-- Enforced doctor-specific filtering for Appointments, Lab & Imaging Orders
-- Automized prescriber identity in Medications and restricted Admins from prescribing
-- Restored strictly filtered UI for Doctors: removed Add Doctor and Audit Logs access"
+git commit -m "chore: add seed script for Admin, Doctor, and Patient default credentials"
 
 Write-Host "Pushing to aayush-made-features branch..." -ForegroundColor Blue
 git push origin aayush-made-features
 
-Write-Host "Checking out main branch..." -ForegroundColor Blue
+Write-Host "Switching to main branch..." -ForegroundColor Blue
 git checkout main
 
 Write-Host "Merging changes into main..." -ForegroundColor Blue
-git merge aayush-made-features -m "Merge branch 'aayush-made-features' into main: RBAC constraints"
+git merge aayush-made-features -m "Merge branch 'aayush-made-features' into main: Seed credentials"
 
 Write-Host "Pushing to main branch..." -ForegroundColor Blue
 git push origin main

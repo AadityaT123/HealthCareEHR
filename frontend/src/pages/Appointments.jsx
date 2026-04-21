@@ -49,6 +49,7 @@ const ApptStatusBadge = ({ status }) => {
 
 const Appointments = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((s) => s.auth);
   const { list: appointments, loading, saving, error } = useSelector((s) => s.appointments);
   const { list: patients } = useSelector((s) => s.patients);
   const { list: doctors } = useSelector((s) => s.doctors);
@@ -60,6 +61,7 @@ const Appointments = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErr, setFormErr] = useState("");
   const [success, setSuccess] = useState("");
+  const [authErr, setAuthErr] = useState("");
 
   useEffect(() => {
     dispatch(fetchAppointments());
@@ -67,7 +69,19 @@ const Appointments = () => {
     dispatch(fetchDoctors());
   }, [dispatch]);
 
-  const filtered = appointments.filter((a) => {
+  const isAdmin = user?.roleName?.toLowerCase() === "admin";
+  const activeDoctor = doctors.find(
+    (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === user?.username?.toLowerCase()
+  );
+
+  let apptsToDisplay = appointments;
+  if (!isAdmin && activeDoctor) {
+    apptsToDisplay = appointments.filter((a) => String(a.doctorId) === String(activeDoctor.id));
+  } else if (!isAdmin && !activeDoctor && doctors.length > 0) {
+    apptsToDisplay = [];
+  }
+
+  const filtered = apptsToDisplay.filter((a) => {
     const pat = patients.find((p) => String(p.id) === String(a.patientId));
     const patName = pat ? `${pat.firstName} ${pat.lastName}`.toLowerCase() : "";
     const matchSearch = !search || patName.includes(search.toLowerCase()) || (a.notes || "").toLowerCase().includes(search.toLowerCase());
@@ -76,7 +90,7 @@ const Appointments = () => {
   });
 
   const openAdd = () => {
-    setForm(EMPTY_FORM); setFormErr(""); setEditAppt(null); setAddOpen(true);
+    setForm(EMPTY_FORM); setFormErr(""); setAuthErr(""); setEditAppt(null); setAddOpen(true);
     setTimeout(() => document.getElementById("appt-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
@@ -90,7 +104,7 @@ const Appointments = () => {
       appointmentType: appt.appointmentType || "Consultation",
       status: appt.status || "Scheduled", notes: appt.notes || "",
     });
-    setFormErr(""); setAddOpen(true);
+    setFormErr(""); setAuthErr(""); setAddOpen(true);
   };
 
   const buildPayload = () => ({
@@ -124,7 +138,16 @@ const Appointments = () => {
     dispatch(cancelAppointment(id));
   };
 
-  const closePanel = () => { setAddOpen(false); setEditAppt(null); };
+  const closePanel = () => { setAddOpen(false); setEditAppt(null); setAuthErr(""); };
+
+  const handleUnauthorizedClick = (e) => {
+    if (!isAdmin && !!editAppt) {
+      e.stopPropagation();
+      e.preventDefault();
+      setAuthErr("You are not Authorized to do such actions");
+      setTimeout(() => setAuthErr(""), 5000);
+    }
+  };
 
   const getPatientName = (id) => { const p = patients.find((pt) => String(pt.id) === String(id)); return p ? `${p.firstName} ${p.lastName}` : `Patient #${id}`; };
   const getDoctorName = (id) => { const d = doctors.find((doc) => String(doc.id) === String(id)); return d ? `Dr. ${d.firstName} ${d.lastName}` : "—"; };
@@ -135,8 +158,8 @@ const Appointments = () => {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Appointments"
-        subtitle={`${appointments.length} total appointments`}
-        action={<Button onClick={openAdd}><CalendarPlus className="h-4 w-4" /> Book Appointment</Button>}
+        subtitle={`${apptsToDisplay.length} total appointments`}
+        action={isAdmin && <Button onClick={openAdd}><CalendarPlus className="h-4 w-4" /> Book Appointment</Button>}
       />
 
       {success && <Alert variant="success" onClose={() => setSuccess("")}>{success}</Alert>}
@@ -189,19 +212,22 @@ const Appointments = () => {
             <div className="px-6 py-4 bg-white">
               <form onSubmit={handleSubmit} className="space-y-3">
                 {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+                {authErr && <Alert variant="error" className="animate-shake !bg-white !text-red-600 !border-red-600 font-bold" onClose={() => setAuthErr("")}>{authErr}</Alert>}
 
                 {/* Row: Patient + Doctor */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
+                    {!isAdmin && !!editAppt && <div className="absolute inset-0 z-10 cursor-not-allowed" onClick={handleUnauthorizedClick} />}
                     <label className={LBL}>Patient <span className="text-red-500">*</span></label>
-                    <select value={form.patientId} onChange={(e) => setForm((f) => ({ ...f, patientId: e.target.value }))} className={F}>
+                    <select disabled={!isAdmin && !!editAppt} value={form.patientId} onChange={(e) => setForm((f) => ({ ...f, patientId: e.target.value }))} className={F}>
                       <option value="">Select patient…</option>
                       {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
+                    {!isAdmin && !!editAppt && <div className="absolute inset-0 z-10 cursor-not-allowed" onClick={handleUnauthorizedClick} />}
                     <label className={LBL}>Doctor <span className="text-red-500">*</span></label>
-                    <select value={form.doctorId} onChange={(e) => setForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
+                    <select disabled={!isAdmin && !!editAppt} value={form.doctorId} onChange={(e) => setForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
                       <option value="">Select doctor…</option>
                       {doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName} — {d.specialization || d.specialty}</option>)}
                     </select>
@@ -210,9 +236,10 @@ const Appointments = () => {
 
                 {/* Row: Type + Status (edit only) */}
                 <div className={`grid gap-3 ${editAppt ? "grid-cols-2" : "grid-cols-1"}`}>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
+                    {!isAdmin && !!editAppt && <div className="absolute inset-0 z-10 cursor-not-allowed" onClick={handleUnauthorizedClick} />}
                     <label className={LBL}>Appointment Type <span className="text-red-500">*</span></label>
-                    <select value={form.appointmentType} onChange={(e) => setForm((f) => ({ ...f, appointmentType: e.target.value }))} className={F}>
+                    <select disabled={!isAdmin && !!editAppt} value={form.appointmentType} onChange={(e) => setForm((f) => ({ ...f, appointmentType: e.target.value }))} className={F}>
                       {APPOINTMENT_TYPES.map((t) => <option key={t}>{t}</option>)}
                     </select>
                   </div>
@@ -228,13 +255,15 @@ const Appointments = () => {
 
                 {/* Row: Date + Time */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
+                    {!isAdmin && !!editAppt && <div className="absolute inset-0 z-10 cursor-not-allowed" onClick={handleUnauthorizedClick} />}
                     <label className={LBL}>Date <span className="text-red-500">*</span></label>
-                    <input type="date" value={form.appointmentDate} onChange={(e) => setForm((f) => ({ ...f, appointmentDate: e.target.value }))} className={F} />
+                    <input disabled={!isAdmin && !!editAppt} type="date" value={form.appointmentDate} onChange={(e) => setForm((f) => ({ ...f, appointmentDate: e.target.value }))} className={F} />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
+                    {!isAdmin && !!editAppt && <div className="absolute inset-0 z-10 cursor-not-allowed" onClick={handleUnauthorizedClick} />}
                     <label className={LBL}>Time</label>
-                    <input type="time" value={form.appointmentTime} onChange={(e) => setForm((f) => ({ ...f, appointmentTime: e.target.value }))} className={F} />
+                    <input disabled={!isAdmin && !!editAppt} type="time" value={form.appointmentTime} onChange={(e) => setForm((f) => ({ ...f, appointmentTime: e.target.value }))} className={F} />
                   </div>
                 </div>
 
@@ -268,7 +297,15 @@ const Appointments = () => {
           {loading ? (
             <CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>
           ) : filtered.length === 0 ? (
-            <CardBody><EmptyState icon={CalendarDays} title="No appointments found" description="Book a new appointment to get started." action={<Button onClick={openAdd}><Plus className="h-4 w-4" /> Book Appointment</Button>} /></CardBody>
+            <CardBody>
+              {isAdmin ? (
+                <EmptyState icon={CalendarDays} title="No appointments found" description="Book a new appointment to get started." action={<Button onClick={openAdd}><Plus className="h-4 w-4" /> Book Appointment</Button>} />
+              ) : (
+                <p className="text-center py-10 text-muted-foreground font-medium text-sm">
+                  {" No appointments are scheduled for you Today! "}
+                </p>
+              )}
+            </CardBody>
           ) : (
             <Table>
               <Thead>
@@ -287,7 +324,9 @@ const Appointments = () => {
                     <Td>
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(a)} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
-                        <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                        {isAdmin && (
+                          <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                        )}
                       </div>
                     </Td>
                   </Tr>

@@ -42,7 +42,7 @@ const getDoctorById = async (req, res) => {
 
 // POST /api/doctors
 const createDoctorHandler = async (req, res) => {
-    const { firstName, lastName, specialization, email, phone, licenseNumber } = req.body;
+    const { firstName, lastName, specialization, department, email, phone, licenseNumber } = req.body;
 
     // Only the three core fields are truly required
     const missing = [];
@@ -71,6 +71,7 @@ const createDoctorHandler = async (req, res) => {
             firstName,
             lastName,
             specialization,
+            department:    department    || null,
             email:         email         || null,
             phone:         phone         || null,
             licenseNumber: licenseNumber || null,

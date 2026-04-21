@@ -33,6 +33,10 @@ const Doctor = sequelize.define("Doctor", {
         allowNull: true,
         unique: true
     },
+    department: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: true

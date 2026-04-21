@@ -64,6 +64,7 @@ const Documentation = () => {
   const { list: appointments } = useSelector((s) => s.appointments);
   // Get the logged-in doctor's ID (if the user is a doctor)
   const authUser = useSelector((s) => s.auth?.user);
+  const isAdmin = authUser?.roleName?.toLowerCase() === 'admin';
   const loggedDoctorId = authUser?.doctorId || authUser?.id ? String(authUser.doctorId || '') : '';
 
   const [search, setSearch] = useState('');
@@ -158,10 +159,12 @@ const Documentation = () => {
         title="Documentation"
         subtitle="Clinical encounters and progress notes"
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={openNote}><Plus className="h-4 w-4" /> Progress Note</Button>
-            <Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>
-          </div>
+          isAdmin && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={openNote}><Plus className="h-4 w-4" /> Progress Note</Button>
+              <Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>
+            </div>
+          )
         }
       />
 
@@ -352,7 +355,7 @@ const Documentation = () => {
                 {loading ? (<CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>)
                   : filteredEnc.length === 0 ? (
                     <CardBody><EmptyState icon={FileText} title="No encounters found" description="Create the first clinical encounter."
-                      action={<Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>} /></CardBody>
+                      action={isAdmin && <Button onClick={openEnc}><Plus className="h-4 w-4" /> New Encounter</Button>} /></CardBody>
                   ) : (
                     <Table>
                       <Thead><Tr><Th>Patient</Th><Th>Chief Complaint</Th><Th>Diagnosis</Th><Th>Plan</Th><Th>Date</Th><Th>Status</Th></Tr></Thead>
@@ -378,7 +381,7 @@ const Documentation = () => {
                 {loading ? (<CardBody><div className="flex justify-center py-16"><Spinner size="lg" /></div></CardBody>)
                   : filteredNote.length === 0 ? (
                     <CardBody><EmptyState icon={FileText} title="No progress notes" description="Create the first progress note."
-                      action={<Button onClick={openNote}><Plus className="h-4 w-4" /> New Note</Button>} /></CardBody>
+                      action={isAdmin && <Button onClick={openNote}><Plus className="h-4 w-4" /> New Note</Button>} /></CardBody>
                   ) : (
                     <Table>
                       <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Subjective</Th><Th>Assessment</Th><Th>Date</Th></Tr></Thead>

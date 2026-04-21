@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchPatients, createPatient, deletePatient } from '../store/slices/patientSlice';
-import { Users, Search, Plus, Trash2, ArrowRight, ChevronLeft, ChevronRight, X, UserPlus } from 'lucide-react';
+import { fetchPatients, createPatient, deletePatient, createPatientLogin } from '../store/slices/patientSlice';
+import { Users, Search, Plus, Trash2, ArrowRight, ChevronLeft, ChevronRight, X, UserPlus, KeyRound } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Modal,
   Input, Select, Table, Thead, Tbody, Tr, Th, Td,
@@ -23,7 +23,9 @@ const PAGE_SIZE = 12;
 const PatientsList = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { user } = useSelector((s) => s.auth);
   const { list: patients, loading, saving, error } = useSelector((s) => s.patients);
+  const isAdmin = user?.roleName?.toLowerCase() === 'admin';
 
   const [search, setSearch] = useState('');
   const [genderFilt, setGenderFilt] = useState('');
@@ -33,6 +35,12 @@ const PatientsList = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formErr, setFormErr] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginTarget, setLoginTarget] = useState(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginErr, setLoginErr] = useState('');
+  const [loginOk, setLoginOk] = useState('');
 
   useEffect(() => { dispatch(fetchPatients()); }, [dispatch]);
 
@@ -90,6 +98,28 @@ const PatientsList = () => {
     setDeleteId(null);
   };
 
+  const handleCreateLogin = async (e) => {
+    e.preventDefault();
+    setLoginErr('');
+    if (!loginForm.username.trim() || !loginForm.password.trim()) {
+      setLoginErr('Username and password are required.');
+      return;
+    }
+    if (loginForm.password.length < 8) {
+      setLoginErr('Password must be at least 8 characters.');
+      return;
+    }
+    const result = await dispatch(createPatientLogin({ username: loginForm.username.trim(), password: loginForm.password }));
+    if (createPatientLogin.fulfilled.match(result)) {
+      setLoginOk(`Login account created for ${loginTarget?.firstName} ${loginTarget?.lastName}. Username: ${loginForm.username}`);
+      setLoginOpen(false);
+      setLoginForm({ username: '', password: '' });
+      setTimeout(() => setLoginOk(''), 6000);
+    } else {
+      setLoginErr(result.payload || 'Failed to create login account.');
+    }
+  };
+
   const calcAge = (dob) => {
     if (!dob) return '—';
     try { return `${differenceInYears(new Date(), new Date(dob))} yrs`; }
@@ -102,13 +132,16 @@ const PatientsList = () => {
         title="Patients"
         subtitle={`${patients.length} total registered patients`}
         action={
-          <Button onClick={openAdd}>
-            <UserPlus className="h-4 w-4" /> Add Patient
-          </Button>
+          isAdmin && (
+            <Button onClick={openAdd}>
+              <UserPlus className="h-4 w-4" /> Add Patient
+            </Button>
+          )
         }
       />
 
       {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
+      {loginOk && <Alert variant="success" onClose={() => setLoginOk('')}>{loginOk}</Alert>}
       {error && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load patients.'}</Alert>}
 
 
@@ -143,11 +176,11 @@ const PatientsList = () => {
         </Card>
 
         {/* Transparent dimming layer — click to close without closing table */}
-        {addOpen && (
+        {(addOpen || loginOpen) && (
           <div
             className="absolute inset-0 z-20"
             style={{ top: '56px' }}
-            onClick={() => setAddOpen(false)}
+            onClick={() => { setAddOpen(false); setLoginOpen(false); }}
           />
         )}
         {/* ── Floating Add Patient Panel — absolutely positioned, table never moves ── */}
@@ -301,6 +334,55 @@ const PatientsList = () => {
           </div>
         )}
 
+        {/* Floating Create Login Account Panel */}
+        {loginOpen && (
+          <div id="login-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white tracking-wide">Create Login Account</h2>
+              </div>
+              <button onClick={() => setLoginOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="px-6 py-4 bg-white">
+              <div className="mb-4 rounded-lg border border-slate-200 px-4 py-3 bg-blue-50 text-sm text-black">
+                Creating a portal login for <strong>{loginTarget?.firstName} {loginTarget?.lastName}</strong>.
+                This account will have the <strong>Patient</strong> role.
+              </div>
+              <form onSubmit={handleCreateLogin} className="space-y-4">
+                {loginErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {loginErr}</div>}
+
+                <Input
+                  label="Username"
+                  required
+                  labelClassName="!text-black"
+                  className="!bg-white !text-black border-slate-300"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                  placeholder="e.g. john.doe"
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  required
+                  labelClassName="!text-black"
+                  className="!bg-white !text-black border-slate-300"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Min 8 characters"
+                />
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button variant="outline" type="button" onClick={() => setLoginOpen(false)}>Cancel</Button>
+                  <Button type="submit" style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}>Create Login</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* ── Patient Table ── */}
         <Card>
           {loading ? (
@@ -311,7 +393,7 @@ const PatientsList = () => {
                 icon={Users}
                 title="No patients found"
                 description={search ? 'Try adjusting your search or filter.' : 'Add your first patient to get started.'}
-                action={!search && (
+                action={!search && isAdmin && (
                   <Button onClick={openAdd}>
                     <Plus className="h-4 w-4" /> Add Patient
                   </Button>
@@ -329,7 +411,8 @@ const PatientsList = () => {
                     <Th>Age / DOB</Th>
                     <Th>Contact</Th>
                     <Th>Blood Type</Th>
-                    <Th className="w-16"></Th>
+                    {isAdmin && <Th>Login</Th>}
+                    {isAdmin && <Th className="w-16"></Th>}
                   </Tr>
                 </Thead>
                 <Tbody>
@@ -365,15 +448,39 @@ const PatientsList = () => {
                           </span>
                         ) : <span className="text-muted-foreground">—</span>}
                       </Td>
-                      <Td>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          title="Delete patient"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </Td>
+                      {isAdmin && (
+                        <Td>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setLoginTarget(p);
+                              setLoginForm({ username: `${p.firstName?.toLowerCase()}${p.lastName?.toLowerCase()}`, password: '' });
+                              setLoginErr('');
+                              setLoginOpen(true);
+                            }}
+                            style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                            onMouseDown={(e) => e.target.style.backgroundColor = '#2563eb'}
+                            onMouseUp={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                          >
+                            <KeyRound className="h-3 w-3" /> Create Login
+                          </Button>
+                        </Td>
+                      )}
+                      {isAdmin && (
+                        <Td>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteId(p.id); }}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Delete patient"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </Td>
+                      )}
                     </Tr>
                   ))}
                 </Tbody>

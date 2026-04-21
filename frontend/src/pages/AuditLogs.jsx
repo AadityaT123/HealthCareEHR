@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Search, Filter } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { ShieldCheck, Search, Filter, Lock } from 'lucide-react';
 import { auditLogService } from '../api/auditLog.service';
 import { PageHeader, Card, CardBody, Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert } from '../components/ui';
 import { format } from 'date-fns';
@@ -10,6 +11,9 @@ const ACTION_COLORS = {
 };
 
 const AuditLogs = () => {
+  const user = useSelector((s) => s.auth?.user);
+  const isAdmin = user?.roleName?.toLowerCase() === 'admin';
+
   const [logs,     setLogs]     = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState('');
@@ -34,6 +38,18 @@ const AuditLogs = () => {
   });
 
   const uniqueActions = [...new Set(logs.map((l) => l.action).filter(Boolean))];
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <EmptyState
+          icon={Lock}
+          title="Access Denied"
+          description="You do not have the required administrative permissions to view system audit logs."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

@@ -1,32 +1,29 @@
-# Git Automation Script: 20 Sequential Commits
-# Pushes to both 'aayush-made-features' and 'main'
+Write-Host "Staging all frontend RBAC UI changes..." -ForegroundColor Blue
+git add .
 
-$branch = git branch --show-current
-if ($branch -ne "aayush-made-features") {
-    Write-Host "Error: Current branch is not 'aayush-made-features'. Please switch before running." -ForegroundColor Red
-    exit
-}
+Write-Host "Committing changes..." -ForegroundColor Blue
+git commit -m "feat: complete strict role-based access control (RBAC) UI constraints
 
-$logFile = ".contribution_log"
+- Applied patient data edit restrictions and added Admin patient login creation
+- Locked doctor side appointment booking/editing with unauthorized popup alerts 
+- Removed 'New Encounter' and 'Progress Note' creation buttons for Doctors
+- Enforced doctor-specific filtering for Appointments, Lab & Imaging Orders
+- Automized prescriber identity in Medications and restricted Admins from prescribing
+- Restored strictly filtered UI for Doctors: removed Add Doctor and Audit Logs access"
 
-Write-Host "Starting 20-commit sequence..." -ForegroundColor Cyan
-
-for ($i = 1; $i -le 20; $i++) {
-    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
-    Add-Content -Path $logFile -Value "Entry #$i - $timestamp"
-    git add $logFile
-    git commit -m "Automated update sequence $i [ref:$timestamp]"
-}
-
-Write-Host "`nPushing sequence to origin/aayush-made-features..." -ForegroundColor Yellow
+Write-Host "Pushing to aayush-made-features branch..." -ForegroundColor Blue
 git push origin aayush-made-features
 
-Write-Host "`nMerging changes into main..." -ForegroundColor Yellow
+Write-Host "Checking out main branch..." -ForegroundColor Blue
 git checkout main
-git merge aayush-made-features --no-edit
+
+Write-Host "Merging changes into main..." -ForegroundColor Blue
+git merge aayush-made-features -m "Merge branch 'aayush-made-features' into main: RBAC constraints"
+
+Write-Host "Pushing to main branch..." -ForegroundColor Blue
 git push origin main
 
-Write-Host "`nReturning to feature branch..." -ForegroundColor Cyan
+Write-Host "Returning to your working branch..." -ForegroundColor Blue
 git checkout aayush-made-features
 
-Write-Host "`n✅ All 20 commits successfully processed and pushed to both branches." -ForegroundColor Green
+Write-Host "Repository synchronisation complete!" -ForegroundColor Green

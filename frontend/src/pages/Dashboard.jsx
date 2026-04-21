@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchAppointments } from '../store/slices/appointmentSlice';
+import { fetchDoctors } from '../store/slices/doctorSlice';
 import { setAllLabOrders, setAllImagingOrders } from '../store/slices/ordersSlice';
 import { labOrderService, imagingOrderService } from '../api/order.service.js';
 import { Card, CardBody, CardHeader, Spinner, Badge, statusVariant } from '../components/ui';
@@ -32,7 +33,9 @@ const StatCard = ({ label, value, icon: Icon, gradient, onClick, loading }) => (
         {loading ? (
           <div className="h-8 w-16 rounded bg-white/20 animate-pulse" />
         ) : (
-          <p className="text-3xl font-bold text-white">{value ?? '—'}</p>
+          <p className={typeof value === 'string' && isNaN(Number(value)) ? "text-lg font-semibold text-white mt-1.5 leading-tight" : "text-3xl font-bold text-white"}>
+            {value ?? '—'}
+          </p>
         )}
       </div>
       <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
@@ -64,10 +67,12 @@ const Dashboard = () => {
   const { list: patients, loading: pLoading } = useSelector((s) => s.patients);
   const { list: appointments, loading: aLoading } = useSelector((s) => s.appointments);
   const { allLabOrders, allImagingOrders } = useSelector((s) => s.orders);
+  const { list: doctors } = useSelector((s) => s.doctors);
 
   useEffect(() => {
     dispatch(fetchPatients());
     dispatch(fetchAppointments());
+    dispatch(fetchDoctors());
     labOrderService.getAll({ limit: 1000 })
       .then((res) => dispatch(setAllLabOrders(toArray(res))))
       .catch(() => { });
@@ -76,13 +81,33 @@ const Dashboard = () => {
       .catch(() => { });
   }, [dispatch]);
 
+  const isAdmin = user?.roleName?.toLowerCase() === 'admin';
+  const activeDoctor = doctors.find(
+    (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === user?.username?.toLowerCase()
+  );
+
+  let dashboardAppointments = appointments;
+  let dashboardLabOrders = allLabOrders;
+  let dashboardImagingOrders = allImagingOrders;
+
+  if (!isAdmin && activeDoctor) {
+    dashboardAppointments = appointments.filter(a => a.doctorId === activeDoctor.id);
+    dashboardLabOrders = allLabOrders.filter(o => o.doctorId === activeDoctor.id);
+    dashboardImagingOrders = allImagingOrders.filter(o => o.doctorId === activeDoctor.id);
+  } else if (!isAdmin && !activeDoctor && doctors.length > 0) {
+    // Fail-safe to avoid blinking global data if slowly loading their mapping
+    dashboardAppointments = [];
+    dashboardLabOrders = [];
+    dashboardImagingOrders = [];
+  }
+
   // Today's appointments
-  const todayAppts = appointments.filter((a) => {
+  const todayAppts = dashboardAppointments.filter((a) => {
     try { return isToday(parseISO(a.appointmentDate || a.date)); }
     catch { return false; }
   });
 
-  const pendingAppts = appointments.filter(
+  const pendingAppts = dashboardAppointments.filter(
     (a) => a.status?.toLowerCase() === 'scheduled'
   ).length;
 
@@ -109,10 +134,12 @@ const Dashboard = () => {
     }
   };
 
-  const activeOrdersCount = [
-    ...allLabOrders,
-    ...allImagingOrders
+  const _rawActiveOrdersCount = [
+    ...dashboardLabOrders,
+    ...dashboardImagingOrders
   ].filter((o) => (o.status || '').toLowerCase() !== 'completed').length;
+
+  const activeOrdersCountDisplay = _rawActiveOrdersCount > 0 ? _rawActiveOrdersCount : 'No orders available';
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -132,7 +159,7 @@ const Dashboard = () => {
             <p className="mt-2 text-blue-100 text-sm max-w-lg">
               Here's your clinical overview. You have{' '}
               <span className="font-semibold text-white">{todayAppts.length}</span>{' '}
-              appointment{todayAppts.length !== 1 ? 's' : ''} scheduled for today.
+              {todayAppts.length === 0 ? 'appointments scheduled for today.' : `appointment${todayAppts.length !== 1 ? 's' : ''} scheduled for today.`}
             </p>
           )}
         </div>
@@ -156,7 +183,7 @@ const Dashboard = () => {
           loading={aLoading} onClick={() => navigate('/appointments')}
         />
         <StatCard
-          label="Lab & Imaging Orders" value={activeOrdersCount} icon={FlaskConical}
+          label="Lab & Imaging Orders" value={activeOrdersCountDisplay} icon={FlaskConical}
           gradient="linear-gradient(135deg, #10b981, #059669)"
           onClick={() => navigate('/orders')}
         />

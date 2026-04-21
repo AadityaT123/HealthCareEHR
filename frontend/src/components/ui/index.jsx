@@ -154,13 +154,13 @@ export const EmptyState = ({ icon: Icon, title, description, action }) => (
 // ─────────────────────────────────────────────────────────────────────────────
 // Input
 // ─────────────────────────────────────────────────────────────────────────────
-export const Input = ({ label, error, hint, className = '', id, required, ...props }) => {
+export const Input = ({ label, error, hint, className = '', labelClassName = '', id, required, ...props }) => {
   const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          {label}{required && <span className="text-destructive ml-1">*</span>}
+        <label htmlFor={inputId} className={cn("text-sm font-medium text-slate-700 dark:text-slate-300", labelClassName)}>
+          {label}{required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <input
@@ -186,13 +186,13 @@ export const Input = ({ label, error, hint, className = '', id, required, ...pro
 // ─────────────────────────────────────────────────────────────────────────────
 // Select
 // ─────────────────────────────────────────────────────────────────────────────
-export const Select = ({ label, error, children, className = '', id, required, ...props }) => {
+export const Select = ({ label, error, children, className = '', labelClassName = '', id, required, ...props }) => {
   const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
   return (
     <div className="space-y-1.5">
       {label && (
-        <label htmlFor={selectId} className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          {label}{required && <span className="text-destructive ml-1">*</span>}
+        <label htmlFor={selectId} className={cn("text-sm font-medium text-slate-700 dark:text-slate-300", labelClassName)}>
+          {label}{required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <select
@@ -225,7 +225,7 @@ export const Textarea = ({ label, error, className = '', id, required, ...props 
     <div className="space-y-1.5">
       {label && (
         <label htmlFor={textareaId} className="text-sm font-medium text-foreground">
-          {label}{required && <span className="text-destructive ml-1">*</span>}
+          {label}{required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       <textarea

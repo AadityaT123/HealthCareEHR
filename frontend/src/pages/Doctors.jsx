@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchDoctors, createDoctor, createDoctorLogin } from '../store/slices/doctorSlice';
-import { Stethoscope, Plus, Search, KeyRound } from 'lucide-react';
+import { Stethoscope, Plus, Search, KeyRound, X } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody, Input, Select, Textarea,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
@@ -22,6 +22,8 @@ const SPECIALTIES = [
 const Doctors = () => {
   const dispatch = useDispatch();
   const { list: doctors, loading, saving, error } = useSelector((s) => s.doctors);
+  const authUser = useSelector((s) => s.auth?.user);
+  const isAdmin = authUser?.roleName?.toLowerCase() === 'admin';
 
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -88,9 +90,11 @@ const Doctors = () => {
         title="Doctors"
         subtitle={`${doctors.length} clinical staff members`}
         action={
-          <Button onClick={() => { setForm(EMPTY_FORM); setFormErr(''); setLoginOpen(false); setAddOpen(true); setTimeout(() => document.getElementById("add-doctor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}>
-            <Plus className="h-4 w-4" /> Add Doctor
-          </Button>
+          isAdmin && (
+            <Button onClick={() => { setForm(EMPTY_FORM); setFormErr(''); setLoginOpen(false); setAddOpen(true); setTimeout(() => document.getElementById("add-doctor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}>
+              <Plus className="h-4 w-4" /> Add Doctor
+            </Button>
+          )
         }
       />
 
@@ -137,27 +141,27 @@ const Doctors = () => {
                 {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
 
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="First Name" required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
-                  <Input label="Last Name" required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
+                  <Input label="First Name" required labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} />
+                  <Input label="Last Name" required labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} />
                 </div>
 
-                <Select label="Specialty" required value={form.specialization} onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}>
+                <Select label="Specialty" required labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.specialization} onChange={(e) => setForm((f) => ({ ...f, specialization: e.target.value }))}>
                   <option value="">Select specialty…</option>
                   {SPECIALTIES.map((s) => <option key={s}>{s}</option>)}
                 </Select>
 
-                <Input label="Department" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} placeholder="e.g. Cardiology Ward" />
+                <Input label="Department" labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} placeholder="e.g. Cardiology Ward" />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <Input label="Phone" type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
-                  <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                  <Input label="Phone" type="tel" labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                  <Input label="Email" type="email" labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
                 </div>
 
-                <Input label="License Number" value={form.licenseNumber} onChange={(e) => setForm((f) => ({ ...f, licenseNumber: e.target.value }))} placeholder="e.g. MD-123456" />
+                <Input label="License Number" labelClassName="!text-black" className="!bg-white !text-black border-slate-300" value={form.licenseNumber} onChange={(e) => setForm((f) => ({ ...f, licenseNumber: e.target.value }))} placeholder="e.g. MD-123456" />
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button variant="outline" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
-                  <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Add Doctor'}</Button>
+                  <Button type="submit" disabled={saving} className="bg-blue-500 text-white hover:bg-blue-600">{saving ? 'Saving…' : 'Add Doctor'}</Button>
                 </div>
               </form>
             </div>
@@ -169,7 +173,7 @@ const Doctors = () => {
           <div id="login-panel"
             className="absolute left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
             style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
-            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#8b5cf6' }}>
+            <div className="flex items-center justify-between px-6 py-3.5" style={{ backgroundColor: '#3b82f6' }}>
               <div className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4 text-white" />
                 <h2 className="text-sm font-semibold text-white tracking-wide">Create Login Account</h2>
@@ -177,19 +181,36 @@ const Doctors = () => {
               <button onClick={() => setLoginOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
             </div>
             <div className="px-6 py-4 bg-white">
-              <div className="mb-4 rounded-lg bg-purple-50 border border-purple-200 px-4 py-3 text-sm text-purple-700">
+              <div className="mb-4 rounded-lg border border-slate-200 px-4 py-3 bg-blue-50 text-sm text-black">
                 Creating a staff login for <strong>Dr. {loginTarget?.firstName} {loginTarget?.lastName}</strong>.
                 This account will have the <strong>Doctor</strong> role and can log in to the EHR system.
               </div>
               <form onSubmit={handleCreateLogin} className="space-y-4">
                 {loginErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {loginErr}</div>}
 
-                <Input label="Username" required value={loginForm.username} onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))} placeholder="e.g. dr.smith" />
-                <Input label="Password" type="password" required value={loginForm.password} onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" />
+                <Input
+                  label="Username"
+                  required
+                  labelClassName="!text-black"
+                  className="!bg-white !text-black border-slate-300"
+                  value={loginForm.username}
+                  onChange={(e) => setLoginForm((f) => ({ ...f, username: e.target.value }))}
+                  placeholder="e.g. dr.smith"
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  required
+                  labelClassName="!text-black"
+                  className="!bg-white !text-black border-slate-300"
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Min 8 characters"
+                />
 
                 <div className="flex justify-end gap-3 pt-2">
                   <Button variant="outline" type="button" onClick={() => setLoginOpen(false)}>Cancel</Button>
-                  <Button type="submit" style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none' }}>Create Login</Button>
+                  <Button type="submit" style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}>Create Login</Button>
                 </div>
               </form>
             </div>
@@ -203,8 +224,8 @@ const Doctors = () => {
           ) : filtered.length === 0 ? (
             <CardBody>
               <EmptyState icon={Stethoscope} title="No doctors found"
-                description="Add clinical staff to get started."
-                action={<Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" />Add Doctor</Button>}
+                description={isAdmin ? "Add clinical staff to get started." : "No clinical staff records available."}
+                action={isAdmin && <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" />Add Doctor</Button>}
               />
             </CardBody>
           ) : (
@@ -216,8 +237,7 @@ const Doctors = () => {
                   <Th>Department</Th>
                   <Th>License #</Th>
                   <Th>Contact</Th>
-                  <Th>Status</Th>
-                  <Th>Login</Th>
+                  {isAdmin && <Th>Login</Th>}
                 </Tr>
               </Thead>
               <Tbody>
@@ -235,27 +255,29 @@ const Doctors = () => {
                     </Td>
                     <Td>{d.specialization || '—'}</Td>
                     <Td className="text-muted-foreground">{d.department || '—'}</Td>
-                    <Td><span className="font-mono text-xs">{d.licenseNumber || '—'}</span></Td>
+                    <Td><span className="font-mono" style={{ fontFamily: 'Calibri, sans-serif' }}>{d.licenseNumber || '—'}</span></Td>
                     <Td className="text-xs text-muted-foreground">{d.email || d.phone || '—'}</Td>
-                    <Td>
-                      <Badge variant={d.isActive === false ? 'danger' : 'success'} className="!bg-white !text-green shadow-sm">
-                        {d.isActive === false ? 'Inactive' : 'Active'}
-                      </Badge>
-                    </Td>
-                    <Td>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setLoginTarget(d);
-                          setLoginForm({ username: `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}`, password: '' });
-                          setLoginErr('');
-                          setLoginOpen(true);
-                        }}
-                      >
-                        <KeyRound className="h-3 w-3" /> Create Login
-                      </Button>
-                    </Td>
+                    {isAdmin && (
+                      <Td>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setLoginTarget(d);
+                            setLoginForm({ username: `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}`, password: '' });
+                            setLoginErr('');
+                            setLoginOpen(true);
+                          }}
+                          style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none' }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                          onMouseDown={(e) => e.target.style.backgroundColor = '#2563eb'}
+                          onMouseUp={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                        >
+                          <KeyRound className="h-3 w-3" /> Create Login
+                        </Button>
+                      </Td>
+                    )}
                   </Tr>
                 ))}
               </Tbody>

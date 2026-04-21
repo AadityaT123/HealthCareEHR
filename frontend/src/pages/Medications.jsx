@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllMedications, fetchAllPrescriptions, createPrescription, updatePrescription } from '../store/slices/medicationsSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
+import { fetchAppointments } from '../store/slices/appointmentSlice';
 import { Pill, Plus, Search, X, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 import {
   PageHeader, Button, Card, CardBody,
@@ -27,9 +28,11 @@ const LBL = "text-xs font-semibold text-slate-700";
 
 const Medications = () => {
   const dispatch = useDispatch();
+  const authUser = useSelector((s) => s.auth?.user);
   const { catalog, prescriptions, loading, saving, error } = useSelector((s) => s.medications);
   const { list: patients } = useSelector((s) => s.patients);
   const { list: doctors } = useSelector((s) => s.doctors);
+  const { list: appointments } = useSelector((s) => s.appointments);
 
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -37,6 +40,7 @@ const Medications = () => {
   const [rxForm, setRxForm] = useState(RX_FORM);
   const [formErr, setFormErr] = useState('');
   const [success, setSuccess] = useState('');
+  const [adminErr, setAdminErr] = useState('');
 
   const [editRxOpen, setEditRxOpen] = useState(false);
   const [editRxForm, setEditRxForm] = useState(null);
@@ -46,13 +50,38 @@ const Medications = () => {
     dispatch(fetchPatients());
     dispatch(fetchDoctors());
     dispatch(fetchAllPrescriptions());
+    dispatch(fetchAppointments());
   }, [dispatch]);
 
   const getPatientName = (pid) => { const p = patients.find((pt) => String(pt.id) === String(pid)); return p ? `${p.firstName} ${p.lastName}` : `Patient #${pid}`; };
   const getDoctorName = (did) => { const d = doctors.find((doc) => String(doc.id) === String(did)); return d ? `Dr. ${d.firstName} ${d.lastName}` : '—'; };
 
+  const isAdmin = authUser?.roleName?.toLowerCase() === 'admin';
+  const activeDoctor = doctors.find(
+    (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === authUser?.username?.toLowerCase()
+  );
+
+  let displayedPrescriptions = prescriptions;
+  let eligiblePatients = patients;
+
+  if (!isAdmin && activeDoctor) {
+    // Filter prescriptions
+    displayedPrescriptions = prescriptions.filter(rx => String(rx.doctorId) === String(activeDoctor.id));
+    
+    // Filter eligible patients based on appointments
+    const eligiblePatientIds = new Set(
+      appointments
+        .filter(a => String(a.doctorId) === String(activeDoctor.id) && ['scheduled', 'completed'].includes((a.status || '').toLowerCase()))
+        .map(a => String(a.patientId))
+    );
+    eligiblePatients = patients.filter(p => eligiblePatientIds.has(String(p.id)));
+  } else if (!isAdmin && !activeDoctor && doctors.length > 0) {
+    displayedPrescriptions = [];
+    eligiblePatients = [];
+  }
+
   const filterCatalog = catalog.filter((m) => !search || (m.medicationName || m.name || '').toLowerCase().includes(search.toLowerCase()));
-  const filterRx = prescriptions.filter((rx) => {
+  const filterRx = displayedPrescriptions.filter((rx) => {
     const patName = getPatientName(rx.patientId).toLowerCase();
     const medName = (rx.Medication?.medicationName || rx.medicationName || '').toLowerCase();
     return !search || patName.includes(search.toLowerCase()) || medName.includes(search.toLowerCase());
@@ -84,7 +113,16 @@ const Medications = () => {
     } else { setFormErr(result.payload || 'Failed to create prescription.'); }
   };
 
-  const openRx = () => { setRxForm(RX_FORM); setFormErr(''); setRxOpen(true); };
+  const openRx = () => { 
+    if (isAdmin) {
+      setAdminErr('Admin cannot prescribe medicine !!');
+      setTimeout(() => setAdminErr(''), 5000);
+      return;
+    }
+    setRxForm({ ...RX_FORM, doctorId: !isAdmin && activeDoctor ? String(activeDoctor.id) : '' }); 
+    setFormErr(''); 
+    setRxOpen(true); 
+  };
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -96,6 +134,7 @@ const Medications = () => {
 
       {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
       {error && <Alert variant="error">{typeof error === 'string' ? error : 'Failed to load medications.'}</Alert>}
+      {adminErr && <Alert variant="error" className="animate-shake !bg-white !text-red-600 !border-red-600 font-bold" onClose={() => setAdminErr('')}>{adminErr}</Alert>}
 
       {/* Relative wrapper */}
       <div className="relative">
@@ -139,15 +178,19 @@ const Medications = () => {
                     <label className={LBL}>Patient <span className="text-red-500">*</span></label>
                     <select value={rxForm.patientId} onChange={(e) => setRxForm((f) => ({ ...f, patientId: e.target.value }))} className={F}>
                       <option value="">Select patient…</option>
-                      {patients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                      {eligiblePatients.map((p) => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
                     <label className={LBL}>Prescribing Doctor <span className="text-red-500">*</span></label>
-                    <select value={rxForm.doctorId} onChange={(e) => setRxForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
-                      <option value="">Select doctor…</option>
-                      {doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</option>)}
-                    </select>
+                    {isAdmin ? (
+                      <select value={rxForm.doctorId} onChange={(e) => setRxForm((f) => ({ ...f, doctorId: e.target.value }))} className={F}>
+                        <option value="">Select doctor…</option>
+                        {doctors.map((d) => <option key={d.id} value={d.id}>Dr. {d.firstName} {d.lastName}</option>)}
+                      </select>
+                    ) : (
+                      <input type="text" className={`${F} bg-slate-50 text-slate-500`} disabled value={activeDoctor ? `Dr. ${activeDoctor.firstName} ${activeDoctor.lastName}` : '—'} />
+                    )}
                   </div>
                 </div>
 
@@ -272,7 +315,17 @@ const Medications = () => {
               <Card>
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : filterRx.length === 0
-                    ? <CardBody><EmptyState icon={Pill} title="No prescriptions" description="Issue the first prescription." action={<Button onClick={openRx}><Plus className="h-4 w-4" /> New Prescription</Button>} /></CardBody>
+                    ? (
+                      <CardBody>
+                        {isAdmin ? (
+                          <EmptyState icon={Pill} title="No prescriptions" description="Issue the first prescription." action={<Button onClick={openRx}><Plus className="h-4 w-4" /> New Prescription</Button>} />
+                        ) : (
+                          <p className="text-center py-10 text-muted-foreground font-medium text-sm">
+                            No Prescription is prescribed
+                          </p>
+                        )}
+                      </CardBody>
+                    )
                     : <>
                       <Table>
                         <Thead><Tr><Th>Patient</Th><Th>Medication</Th><Th>Dosage</Th><Th>Frequency</Th><Th>Duration</Th><Th>Prescribed By</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>

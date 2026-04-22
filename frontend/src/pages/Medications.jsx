@@ -57,17 +57,27 @@ const Medications = () => {
   const getDoctorName = (did) => { const d = doctors.find((doc) => String(doc.id) === String(did)); return d ? `Dr. ${d.firstName} ${d.lastName}` : '—'; };
 
   const isAdmin = authUser?.roleName?.toLowerCase() === 'admin';
+  const isPatient = authUser?.roleName?.toLowerCase() === 'patient';
   const activeDoctor = doctors.find(
     (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === authUser?.username?.toLowerCase()
   );
 
+  // Find the patient record for the logged-in patient user
+  const myPatientRecord = isPatient
+    ? patients.find((p) => `${p.firstName?.toLowerCase()}${p.lastName?.toLowerCase()}` === authUser?.username?.toLowerCase())
+    : null;
+
   let displayedPrescriptions = prescriptions;
   let eligiblePatients = patients;
 
-  if (!isAdmin && activeDoctor) {
+  if (isPatient) {
+    displayedPrescriptions = myPatientRecord
+      ? prescriptions.filter((rx) => String(rx.patientId) === String(myPatientRecord.id))
+      : [];
+    eligiblePatients = [];
+  } else if (!isAdmin && activeDoctor) {
     // Filter prescriptions
     displayedPrescriptions = prescriptions.filter(rx => String(rx.doctorId) === String(activeDoctor.id));
-    
     // Filter eligible patients based on appointments
     const eligiblePatientIds = new Set(
       appointments
@@ -127,9 +137,9 @@ const Medications = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       <PageHeader
-        title="Medications"
-        subtitle="Prescriptions, drug catalog, and administration records"
-        action={<Button onClick={openRx}><Plus className="h-4 w-4" /> New Prescription</Button>}
+        title={isPatient ? 'Your Medications' : 'Medications'}
+        subtitle={isPatient ? undefined : 'Prescriptions, drug catalog, and administration records'}
+        action={!isPatient && <Button onClick={openRx}><Plus className="h-4 w-4" /> New Prescription</Button>}
       />
 
       {success && <Alert variant="success" onClose={() => setSuccess('')}>{success}</Alert>}
@@ -139,16 +149,18 @@ const Medications = () => {
       {/* Relative wrapper */}
       <div className="relative">
 
-        {/* Search bar */}
-        <Card>
-          <CardBody className="py-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search medications, patients…"
-                className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
-            </div>
-          </CardBody>
-        </Card>
+        {/* Search bar — hidden for patients */}
+        {!isPatient && (
+          <Card>
+            <CardBody className="py-3">
+              <div className="relative max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search medications, patients…"
+                  className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Click-away dimmer */}
         {(rxOpen || editRxOpen) && <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setRxOpen(false); setEditRxOpen(false); }} />}
@@ -308,7 +320,8 @@ const Medications = () => {
           <Tabs defaultTab="prescriptions">
             <TabList>
               <Tab id="prescriptions">Prescriptions ({filterRx.length})</Tab>
-              <Tab id="catalog">Drug Catalog ({filterCatalog.length})</Tab>
+              {isPatient && <Tab id="instructions">Instructions ({filterRx.filter((rx) => rx.notes && rx.notes.trim()).length})</Tab>}
+              {!isPatient && <Tab id="catalog">Drug Catalog ({filterCatalog.length})</Tab>}
             </TabList>
 
             <TabPanel id="prescriptions">
@@ -328,26 +341,33 @@ const Medications = () => {
                     )
                     : <>
                       <Table>
-                        <Thead><Tr><Th>Patient</Th><Th>Medication</Th><Th>Dosage</Th><Th>Frequency</Th><Th>Duration</Th><Th>Prescribed By</Th><Th>Status</Th><Th>Action</Th></Tr></Thead>
+                        <Thead><Tr>
+                          {!isPatient && <Th>Patient</Th>}
+                          <Th>Medication</Th><Th>Dosage</Th><Th>Frequency</Th><Th>Duration</Th>
+                          <Th>Prescribed By</Th><Th>Status</Th>
+                          {!isPatient && <Th>Action</Th>}
+                        </Tr></Thead>
                         <Tbody>
                           {paginatedRx.map((rx) => (
                             <Tr key={rx.id}>
-                              <Td><span className="font-medium">{getPatientName(rx.patientId)}</span></Td>
+                              {!isPatient && <Td><span className="font-medium">{getPatientName(rx.patientId)}</span></Td>}
                               <Td>{rx.Medication?.medicationName || rx.medicationName || '—'}</Td>
                               <Td className="font-mono text-sm">{rx.dosage || '—'}</Td>
                               <Td className="text-muted-foreground">{rx.frequency || '—'}</Td>
                               <Td className="text-muted-foreground">{rx.duration || '—'}</Td>
                               <Td className="text-muted-foreground">{getDoctorName(rx.doctorId)}</Td>
                               <Td><Badge variant={statusVariant(rx.status)} className="!bg-white shadow-sm">{rx.status || 'Active'}</Badge></Td>
-                              <Td>
-                                {['active', 'upcoming', 'completed'].includes((rx.status || 'Active').toLowerCase()) ? (
-                                  <button
-                                    onClick={() => { setFormErr(''); setEditRxForm({ id: rx.id, status: rx.status || 'Active' }); setEditRxOpen(true); }}
-                                    className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-medium text-xs">
-                                    <Edit className="h-3.5 w-3.5" /> Edit
-                                  </button>
-                                ) : <span className="text-muted-foreground">—</span>}
-                              </Td>
+                              {!isPatient && (
+                                <Td>
+                                  {['active', 'upcoming', 'completed'].includes((rx.status || 'Active').toLowerCase()) ? (
+                                    <button
+                                      onClick={() => { setFormErr(''); setEditRxForm({ id: rx.id, status: rx.status || 'Active' }); setEditRxOpen(true); }}
+                                      className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-medium text-xs">
+                                      <Edit className="h-3.5 w-3.5" /> Edit
+                                    </button>
+                                  ) : <span className="text-muted-foreground">—</span>}
+                                </Td>
+                              )}
                             </Tr>
                           ))}
                         </Tbody>
@@ -381,6 +401,49 @@ const Medications = () => {
               </Card>
             </TabPanel>
 
+            {/* Instructions Tab — Patient only */}
+            {isPatient && (
+              <TabPanel id="instructions">
+                {filterRx.filter((rx) => rx.notes && rx.notes.trim()).length === 0 ? (
+                  <Card>
+                    <CardBody>
+                      <p className="text-center py-10 text-sm text-muted-foreground">No instructions have been added to your prescriptions yet.</p>
+                    </CardBody>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                    {filterRx
+                      .filter((rx) => rx.notes && rx.notes.trim())
+                      .map((rx) => (
+                        <div
+                          key={rx.id}
+                          className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Pill className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-foreground truncate">
+                                {rx.Medication?.medicationName || rx.medicationName || '—'}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{getDoctorName(rx.doctorId)}</p>
+                            </div>
+                            <Badge variant={statusVariant(rx.status)} className="!bg-white shadow-sm flex-shrink-0">
+                              {rx.status || 'Active'}
+                            </Badge>
+                          </div>
+                          <div className="border-t border-border/50 pt-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p>
+                            <p className="text-sm text-foreground leading-relaxed">{rx.notes}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </TabPanel>
+            )}
+
             <TabPanel id="catalog">
               <Card>
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
@@ -407,6 +470,7 @@ const Medications = () => {
       </div> {/* end relative wrapper */}
 
       <style>{`@keyframes slideDown { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
     </div>
   );
 };

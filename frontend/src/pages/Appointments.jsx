@@ -70,12 +70,23 @@ const Appointments = () => {
   }, [dispatch]);
 
   const isAdmin = user?.roleName?.toLowerCase() === "admin";
+  const isPatient = user?.roleName?.toLowerCase() === "patient";
   const activeDoctor = doctors.find(
     (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === user?.username?.toLowerCase()
   );
 
+  // Find the patient record matching the logged-in patient user
+  const myPatientRecord = isPatient
+    ? patients.find((p) => `${p.firstName?.toLowerCase()}${p.lastName?.toLowerCase()}` === user?.username?.toLowerCase())
+    : null;
+
   let apptsToDisplay = appointments;
-  if (!isAdmin && activeDoctor) {
+  if (isPatient) {
+    // Show only this patient's own appointments
+    apptsToDisplay = myPatientRecord
+      ? appointments.filter((a) => String(a.patientId) === String(myPatientRecord.id))
+      : [];
+  } else if (!isAdmin && activeDoctor) {
     apptsToDisplay = appointments.filter((a) => String(a.doctorId) === String(activeDoctor.id));
   } else if (!isAdmin && !activeDoctor && doctors.length > 0) {
     apptsToDisplay = [];
@@ -157,8 +168,8 @@ const Appointments = () => {
   return (
     <div className="space-y-4 animate-fade-in">
       <PageHeader
-        title="Appointments"
-        subtitle={`${apptsToDisplay.length} total appointments`}
+        title={isPatient ? "Your Appointments" : "Appointments"}
+        subtitle={!isPatient ? `${apptsToDisplay.length} total appointments` : undefined}
         action={isAdmin && <Button onClick={openAdd}><CalendarPlus className="h-4 w-4" /> Book Appointment</Button>}
       />
 
@@ -168,24 +179,26 @@ const Appointments = () => {
       {/* relative wrapper — search + floating panel + table share stacking context */}
       <div className="relative">
 
-        {/* Search / Filter bar */}
-        <Card>
-          <CardBody className="py-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by patient name"
-                  className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+        {/* Search / Filter bar — hidden for patients */}
+        {!isPatient && (
+          <Card>
+            <CardBody className="py-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by patient name"
+                    className="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                </div>
+                <select value={statusFlt} onChange={(e) => setStatusFlt(e.target.value)}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                  <option value="">Status</option>
+                  {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
+                </select>
               </div>
-              <select value={statusFlt} onChange={(e) => setStatusFlt(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                <option value="">Status</option>
-                {STATUS_OPTIONS.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Click-away dimmer */}
         {addOpen && <div className="absolute inset-0 z-20" style={{ top: "56px" }} onClick={closePanel} />}
@@ -310,25 +323,31 @@ const Appointments = () => {
             <Table>
               <Thead>
                 <Tr>
-                  <Th>Patient</Th><Th>Doctor</Th><Th>Date &amp; Time</Th><Th>Type</Th><Th>Status</Th><Th className="w-28">Actions</Th>
+                  {!isPatient && <Th>Patient</Th>}
+                  <Th>Doctor</Th><Th>Date &amp; Time</Th><Th>Type</Th><Th>Status</Th>
+                  {!isPatient && <Th className="w-28">Actions</Th>}
                 </Tr>
               </Thead>
               <Tbody>
                 {filtered.map((a) => (
                   <Tr key={a.id}>
-                    <Td><div className="flex items-center gap-2"><div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold flex-shrink-0"><User className="h-3.5 w-3.5" /></div><span className="font-medium">{getPatientName(a.patientId)}</span></div></Td>
+                    {!isPatient && (
+                      <Td><div className="flex items-center gap-2"><div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold flex-shrink-0"><User className="h-3.5 w-3.5" /></div><span className="font-medium">{getPatientName(a.patientId)}</span></div></Td>
+                    )}
                     <Td className="text-muted-foreground">{getDoctorName(a.doctorId)}</Td>
                     <Td><div><p>{formatApptDate(a.appointmentDate)}</p>{formatApptTime(a.appointmentDate) && <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> {formatApptTime(a.appointmentDate)}</p>}</div></Td>
                     <Td><Badge variant="muted">{a.appointmentType || "—"}</Badge></Td>
                     <Td><ApptStatusBadge status={a.status || "Scheduled"} /></Td>
-                    <Td>
-                      <div className="flex gap-1">
-                        <button onClick={() => openEdit(a)} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
-                        {isAdmin && (
-                          <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
-                        )}
-                      </div>
-                    </Td>
+                    {!isPatient && (
+                      <Td>
+                        <div className="flex gap-1">
+                          <button onClick={() => openEdit(a)} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
+                          {isAdmin && (
+                            <button onClick={() => handleDelete(a.id)} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                          )}
+                        </div>
+                      </Td>
+                    )}
                   </Tr>
                 ))}
               </Tbody>

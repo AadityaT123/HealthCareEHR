@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchAllMedications, fetchAllPrescriptions, createPrescription, updatePrescription } from '../store/slices/medicationsSlice';
+import { fetchAllMedications, fetchAllPrescriptions, createPrescription, updatePrescription, createMedication } from '../store/slices/medicationsSlice';
 import { fetchPatients } from '../store/slices/patientSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
 import { fetchAppointments } from '../store/slices/appointmentSlice';
 import { Pill, Plus, Search, X, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 import {
-  PageHeader, Button, Card, CardBody,
+  PageHeader, Button, Card, CardHeader, CardBody,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert,
   Tabs, TabList, Tab, TabPanel, statusVariant,
 } from '../components/ui';
@@ -14,7 +14,15 @@ import { format } from 'date-fns';
 
 const FREQUENCIES = ['Once daily', 'Twice daily', 'Three times daily', 'Every 6 hours', 'Every 8 hours', 'Every 12 hours', 'As needed (PRN)', 'Weekly', 'Monthly'];
 const DURATIONS = ['3 days', '5 days', '7 days', '10 days', '14 days', '30 days', '60 days', '90 days', 'Ongoing'];
+const DOSAGES = ['5mg', '10mg', '20mg', '25mg', '50mg', '100mg', '200mg', '250mg', '500mg', '750mg', '1000mg', '1g', '2g', '5ml', '10ml'];
 const PAGE_SIZE = 12;
+
+const DRUG_FORM = {
+  medicationName: '',
+  category: '',
+  dosage: '',
+  instructions: '',
+};
 
 const RX_FORM = {
   patientId: '', doctorId: '', medicationId: '',
@@ -44,6 +52,9 @@ const Medications = () => {
 
   const [editRxOpen, setEditRxOpen] = useState(false);
   const [editRxForm, setEditRxForm] = useState(null);
+
+  const [drugOpen, setDrugOpen] = useState(false);
+  const [drugForm, setDrugForm] = useState(DRUG_FORM);
 
   useEffect(() => {
     dispatch(fetchAllMedications());
@@ -123,6 +134,21 @@ const Medications = () => {
     } else { setFormErr(result.payload || 'Failed to create prescription.'); }
   };
 
+  const handleDrugSubmit = async (e) => {
+    e.preventDefault(); setFormErr('');
+    if (!drugForm.medicationName) { setFormErr('Drug name is required.'); return; }
+    if (!drugForm.category) { setFormErr('Category is required.'); return; }
+    if (!drugForm.dosage) { setFormErr('Dosage is required.'); return; }
+    if (!drugForm.instructions) { setFormErr('Instructions are required.'); return; }
+
+    const result = await dispatch(createMedication(drugForm));
+
+    if (createMedication.fulfilled.match(result)) {
+      setSuccess('Medication added to catalog successfully.'); setDrugOpen(false); setDrugForm(DRUG_FORM);
+      setTimeout(() => setSuccess(''), 4000);
+    } else { setFormErr(result.payload || 'Failed to add drug.'); }
+  };
+
   const openRx = () => { 
     if (isAdmin) {
       setAdminErr('Admin cannot prescribe medicine !!');
@@ -163,7 +189,7 @@ const Medications = () => {
         )}
 
         {/* Click-away dimmer */}
-        {(rxOpen || editRxOpen) && <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setRxOpen(false); setEditRxOpen(false); }} />}
+        {(rxOpen || editRxOpen || drugOpen) && <div className="absolute inset-0 z-20" style={{ top: '56px' }} onClick={() => { setRxOpen(false); setEditRxOpen(false); setDrugOpen(false); }} />}
 
         {/* New Prescription Floating Panel */}
         {rxOpen && (
@@ -209,7 +235,20 @@ const Medications = () => {
                 {/* Medication */}
                 <div className="space-y-1">
                   <label className={LBL}>Medication (from catalog) <span className="text-red-500">*</span></label>
-                  <select value={rxForm.medicationId} onChange={(e) => setRxForm((f) => ({ ...f, medicationId: e.target.value }))} className={F}>
+                  <select
+                    value={rxForm.medicationId}
+                    onChange={(e) => {
+                      const mid = e.target.value;
+                      const drug = catalog.find(m => String(m.id) === String(mid));
+                      setRxForm((f) => ({
+                        ...f,
+                        medicationId: mid,
+                        dosage: drug?.dosage || f.dosage,
+                        notes: drug?.instructions || f.notes
+                      }));
+                    }}
+                    className={F}
+                  >
                     <option value="">Select medication…</option>
                     {catalog.map((m) => <option key={m.id} value={m.id}>{m.medicationName || m.name} {m.dosage ? `(${m.dosage})` : ''}</option>)}
                   </select>
@@ -311,6 +350,61 @@ const Medications = () => {
                   }
                 }} disabled={saving} className="h-8 px-5 rounded-md text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600">Save</button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Drug Floating Panel — Admin only */}
+        {drugOpen && isAdmin && (
+          <div id="drug-panel"
+            className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl z-30 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: '64px', animation: 'slideDown 0.18s ease-out' }}>
+            <div className="flex items-center justify-between px-6 py-3.5 bg-emerald-600">
+              <div className="flex items-center gap-2">
+                <Pill className="h-4 w-4 text-white" />
+                <h2 className="text-sm font-semibold text-white tracking-wide">Add New Drug to Catalog</h2>
+              </div>
+              <button onClick={() => setDrugOpen(false)} className="p-1 rounded hover:bg-white/20 text-white/80 hover:text-white transition-colors"><X className="h-4 w-4" /></button>
+            </div>
+
+            <div className="px-6 py-4 bg-white">
+              <form onSubmit={handleDrugSubmit} className="space-y-4">
+                {formErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-xs"><span className="font-semibold">Error:</span> {formErr}</div>}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className={LBL}>Name of Drug <span className="text-red-500">*</span></label>
+                    <input value={drugForm.medicationName} onChange={(e) => setDrugForm(f => ({ ...f, medicationName: e.target.value }))} placeholder="e.g. Amoxicillin" className={F} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className={LBL}>Category <span className="text-red-500">*</span></label>
+                    <input value={drugForm.category} onChange={(e) => setDrugForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Antibiotic" className={F} />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className={LBL}>Dosage <span className="text-red-500">*</span></label>
+                  <select value={drugForm.dosage} onChange={(e) => setDrugForm(f => ({ ...f, dosage: e.target.value }))} className={F}>
+                    <option value="">Select dosage…</option>
+                    {DOSAGES.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className={LBL}>Instructions <span className="text-red-500">*</span></label>
+                  <textarea rows={3} value={drugForm.instructions} onChange={(e) => setDrugForm(f => ({ ...f, instructions: e.target.value }))} placeholder="General instructions for this drug…" className={FTA} />
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <p className="text-xs text-slate-400"><span className="text-red-500">*</span> Strictly required</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setDrugOpen(false)} className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">Cancel</button>
+                    <button type="submit" disabled={saving} className="h-8 px-5 rounded-md text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-colors disabled:opacity-60">
+                      {saving ? 'Adding…' : 'Add Drug'}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -446,9 +540,23 @@ const Medications = () => {
 
             <TabPanel id="catalog">
               <Card>
+                <CardHeader
+                  action={
+                    isAdmin && (
+                      <Button onClick={() => { setFormErr(''); setDrugForm(DRUG_FORM); setDrugOpen(true); }} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white border-none">
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Add Drug
+                      </Button>
+                    )
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Pill className="h-4 w-4 text-emerald-600" />
+                    <span className="font-semibold text-foreground">Drug Catalogue</span>
+                  </div>
+                </CardHeader>
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : filterCatalog.length === 0
-                    ? <CardBody><EmptyState icon={Pill} title="No medications in catalog" description="The drug catalog is empty." /></CardBody>
+                    ? <CardBody><EmptyState icon={Pill} title="No medications in catalog" description="The drug catalog is empty." action={isAdmin && <Button onClick={() => setDrugOpen(true)} className="bg-emerald-600 border-none">Add First Drug</Button>} /></CardBody>
                     : <Table>
                       <Thead><Tr><Th>Name</Th><Th>Category</Th><Th>Dosage</Th><Th>Instructions</Th></Tr></Thead>
                       <Tbody>

@@ -5,7 +5,7 @@ import {
 } from "../store/slices/appointmentSlice";
 import { fetchPatients } from "../store/slices/patientSlice";
 import { fetchDoctors } from "../store/slices/doctorSlice";
-import { CalendarDays, Plus, Search, Clock, User, X, CalendarPlus } from "lucide-react";
+import { CalendarDays, Plus, Search, Clock, User, X, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   PageHeader, Button, Card, CardBody, Modal,
   Table, Thead, Tbody, Tr, Th, Td, Badge, Spinner, EmptyState, Alert, statusVariant,
@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   patientId: "", doctorId: "", appointmentDate: "", appointmentTime: "",
   appointmentType: "Consultation", status: "Scheduled", notes: "",
 };
+const PAGE_SIZE = 12;
 
 // Shared field classes
 const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
@@ -47,6 +48,29 @@ const ApptStatusBadge = ({ status }) => {
   );
 };
 
+// Custom type badge — white bg, specific text colours
+const TYPE_STYLE = {
+  Consultation: { color: '#eab308', border: '#fef08a' }, // yellow-600
+  'Follow-up': { color: '#3b82f6', border: '#bfdbfe' }, // blue-500
+  Emergency: { color: '#ef4444', border: '#fecaca' }, // red-500
+  'Routine Check-up': { color: '#3b82f6', border: '#bfdbfe' }, // blue-500
+};
+
+const ApptTypeBadge = ({ type }) => {
+  const s = TYPE_STYLE[type] || { color: '#64748b', border: '#e2e8f0' };
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: '9999px',
+      fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.01em',
+      backgroundColor: '#ffffff', color: s.color,
+      border: `1px solid ${s.border}`,
+      boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+    }}>
+      {type || '—'}
+    </span>
+  );
+};
+
 const Appointments = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((s) => s.auth);
@@ -62,6 +86,7 @@ const Appointments = () => {
   const [formErr, setFormErr] = useState("");
   const [success, setSuccess] = useState("");
   const [authErr, setAuthErr] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     dispatch(fetchAppointments());
@@ -99,6 +124,12 @@ const Appointments = () => {
     const matchStatus = !statusFlt || a.status === statusFlt;
     return matchSearch && matchStatus;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [search, statusFlt]);
 
   const openAdd = () => {
     setForm(EMPTY_FORM); setFormErr(""); setAuthErr(""); setEditAppt(null); setAddOpen(true);
@@ -329,14 +360,14 @@ const Appointments = () => {
                 </Tr>
               </Thead>
               <Tbody>
-                {filtered.map((a) => (
+                {paginatedData.map((a) => (
                   <Tr key={a.id}>
                     {!isPatient && (
                       <Td><div className="flex items-center gap-2"><div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold flex-shrink-0"><User className="h-3.5 w-3.5" /></div><span className="font-medium">{getPatientName(a.patientId)}</span></div></Td>
                     )}
                     <Td className="text-muted-foreground">{getDoctorName(a.doctorId)}</Td>
                     <Td><div><p>{formatApptDate(a.appointmentDate)}</p>{formatApptTime(a.appointmentDate) && <p className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> {formatApptTime(a.appointmentDate)}</p>}</div></Td>
-                    <Td><Badge variant="muted">{a.appointmentType || "—"}</Badge></Td>
+                    <Td><ApptTypeBadge type={a.appointmentType} /></Td>
                     <Td><ApptStatusBadge status={a.status || "Scheduled"} /></Td>
                     {!isPatient && (
                       <Td>
@@ -352,6 +383,30 @@ const Appointments = () => {
                 ))}
               </Tbody>
             </Table>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-sm text-foreground px-2">{page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="h-8 w-8 rounded-md border border-input flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40 transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           )}
         </Card>
       </div> {/* end relative wrapper */}

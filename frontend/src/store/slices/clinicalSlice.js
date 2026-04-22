@@ -7,7 +7,9 @@ export const fetchEncountersByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await encounterService.getByPatient(patientId);
-      return res.data;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      // axiosClient already unwraps response.data, so res IS that object
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch encounters');
     }
@@ -19,7 +21,7 @@ export const createEncounter = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await encounterService.create(data);
-      return res.data;
+      return res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to create encounter');
     }
@@ -32,7 +34,8 @@ export const fetchProgressNotesByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await progressNoteService.getByPatient(patientId);
-      return res.data;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch progress notes');
     }
@@ -44,7 +47,7 @@ export const createProgressNote = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await progressNoteService.create(data);
-      return res.data;
+      return res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to create progress note');
     }
@@ -57,7 +60,8 @@ export const fetchMedicalHistoryByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await medicalHistoryService.getByPatient(patientId);
-      return res.data;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch medical history');
     }

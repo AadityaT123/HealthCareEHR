@@ -16,7 +16,7 @@ export const createImagingOrderV = Joi.object({
 });
 
 export const updateImagingOrderV = Joi.object({
-    status:     Joi.string().valid("Pending", "Scheduled", "Completed", "Cancelled").optional(),
+    status:     Joi.string().valid("Ordered", "Scheduled", "In Progress", "Completed", "Cancelled", "Rejected").optional(),
     resultUrl:  Joi.string().uri().optional(),
     scheduledAt: Joi.date().iso().optional()
 }).min(1);

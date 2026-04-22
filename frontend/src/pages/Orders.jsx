@@ -34,6 +34,7 @@ const LBL = "text-xs font-semibold text-slate-700";
 
 const Orders = () => {
   const dispatch = useDispatch();
+  const authUser = useSelector((s) => s.auth?.user);
   const { allLabOrders, allImagingOrders, loading, error } = useSelector((s) => s.orders);
   const { list: patients } = useSelector((s) => s.patients);
   const { list: doctors } = useSelector((s) => s.doctors);
@@ -165,8 +166,24 @@ const Orders = () => {
     }
   };
 
-  const fLab = filterList(allLabOrders);
-  const fImg = filterList(allImagingOrders);
+  const isAdmin = authUser?.roleName?.toLowerCase() === 'admin';
+  const activeDoctor = doctors.find(
+    (d) => `dr.${d.firstName?.toLowerCase()}${d.lastName?.toLowerCase()}` === authUser?.username?.toLowerCase()
+  );
+
+  let displayedLabOrders = allLabOrders;
+  let displayedImgOrders = allImagingOrders;
+
+  if (!isAdmin && activeDoctor) {
+    displayedLabOrders = allLabOrders.filter((o) => String(o.doctorId) === String(activeDoctor.id));
+    displayedImgOrders = allImagingOrders.filter((o) => String(o.doctorId) === String(activeDoctor.id));
+  } else if (!isAdmin && !activeDoctor && doctors.length > 0) {
+    displayedLabOrders = [];
+    displayedImgOrders = [];
+  }
+
+  const fLab = filterList(displayedLabOrders);
+  const fImg = filterList(displayedImgOrders);
 
   const labTotalPages = Math.max(1, Math.ceil(fLab.length / PAGE_SIZE));
   const imgTotalPages = Math.max(1, Math.ceil(fImg.length / PAGE_SIZE));
@@ -180,10 +197,12 @@ const Orders = () => {
         title="Orders"
         subtitle="Lab orders and imaging requests"
         action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>
-            <Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>
-          </div>
+          isAdmin && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>
+              <Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>
+            </div>
+          )
         }
       />
 
@@ -426,7 +445,17 @@ const Orders = () => {
               <Card>
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : fLab.length === 0
-                    ? <CardBody><EmptyState icon={FlaskConical} title="No lab orders" description="Order the first lab test." action={<Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>} /></CardBody>
+                    ? (
+                      <CardBody>
+                        {isAdmin ? (
+                          <EmptyState icon={FlaskConical} title="No lab orders" description="Order the first lab test." action={<Button onClick={openLab}><Plus className="h-4 w-4" /> Lab Order</Button>} />
+                        ) : (
+                          <p className="text-center py-10 text-muted-foreground font-medium text-sm">
+                            No orders are available for you
+                          </p>
+                        )}
+                      </CardBody>
+                    )
                     : <>
                       <Table>
                         <Thead><Tr><Th>Patient</Th><Th>Panel / Test</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th><Th className="w-28">Actions</Th></Tr></Thead>
@@ -441,7 +470,9 @@ const Orders = () => {
                               <Td>
                                 <div className="flex gap-1">
                                   <button onClick={() => openStatusEdit(o, 'lab')} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
-                                  <button onClick={() => handleDelete(o.id, 'lab')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                  {isAdmin && (
+                                    <button onClick={() => handleDelete(o.id, 'lab')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                  )}
                                 </div>
                               </Td>
                             </Tr>
@@ -480,7 +511,17 @@ const Orders = () => {
               <Card>
                 {loading ? <CardBody><div className="flex justify-center py-12"><Spinner size="lg" /></div></CardBody>
                   : fImg.length === 0
-                    ? <CardBody><EmptyState icon={Scan} title="No imaging orders" description="Create an imaging request." action={<Button onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>} /></CardBody>
+                    ? (
+                      <CardBody>
+                        {isAdmin ? (
+                          <EmptyState icon={Scan} title="No imaging orders" description="Create an imaging request." action={<Button onClick={openImg}><Plus className="h-4 w-4" /> Imaging</Button>} />
+                        ) : (
+                          <p className="text-center py-10 text-muted-foreground font-medium text-sm">
+                            No orders are available for you
+                          </p>
+                        )}
+                      </CardBody>
+                    )
                     : <>
                       <Table>
                         <Thead><Tr><Th>Patient</Th><Th>Type</Th><Th>Body Part</Th><Th>Priority</Th><Th>Ordered</Th><Th>Status</Th><Th className="w-28">Actions</Th></Tr></Thead>
@@ -496,7 +537,9 @@ const Orders = () => {
                               <Td>
                                 <div className="flex gap-1">
                                   <button onClick={() => openStatusEdit(o, 'img')} className="px-2 py-1 text-xs rounded-md border border-input hover:bg-muted transition-colors">Edit</button>
-                                  <button onClick={() => handleDelete(o.id, 'img')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                  {isAdmin && (
+                                    <button onClick={() => handleDelete(o.id, 'img')} className="px-2 py-1 text-xs rounded-md border border-slate-200 bg-white text-black active:bg-red-600 active:text-white active:border-red-600 transition-all duration-200">Delete</button>
+                                  )}
                                 </div>
                               </Td>
                             </Tr>

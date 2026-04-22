@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPatientById, clearCurrentPatient, updatePatient } from '../store/slices/patientSlice';
-import { fetchMedicalHistoryByPatient, fetchEncountersByPatient, fetchProgressNotesByPatient, clearClinicalData } from '../store/slices/clinicalSlice';
+import { fetchEncountersByPatient, fetchProgressNotesByPatient, clearClinicalData } from '../store/slices/clinicalSlice';
 import { fetchLabOrdersByPatient, fetchImagingOrdersByPatient } from '../store/slices/ordersSlice';
-import { fetchPrescriptionsByPatient } from '../store/slices/medicationsSlice';
+import { fetchPrescriptionsByPatient, clearMedicationData } from '../store/slices/medicationsSlice';
 import { fetchAppointmentsByPatient } from '../store/slices/appointmentSlice';
-import { ArrowLeft, Edit, User, HeartPulse, FileText, Activity, Pill, CalendarDays, X } from 'lucide-react';
+import { ArrowLeft, Edit, User, FileText, Activity, Pill, CalendarDays, X } from 'lucide-react';
 import { format, differenceInYears } from 'date-fns';
 import {
   Card, CardHeader, CardBody, Tabs, TabList, Tab, TabPanel,
@@ -26,24 +26,36 @@ const F = "flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2
 
 
 const PatientDetail = () => {
-  const { id }    = useParams();
-  const navigate  = useNavigate();
-  const dispatch  = useDispatch();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const { currentPatient, loading, error } = useSelector((s) => s.patients);
-  const { encounters, progressNotes, medicalHistory, loading: cLoading } = useSelector((s) => s.clinical);
-  const { labOrders, imagingOrders, loading: oLoading } = useSelector((s) => s.orders);
-  const { prescriptions, loading: mLoading } = useSelector((s) => s.medications);
-  const { patientList: appts, loading: aLoading } = useSelector((s) => s.appointments);
+  const { user } = useSelector((s) => s.auth);
+  const {
+    encounters = [],
+    progressNotes = [],
+    loading: cLoading,
+  } = useSelector((s) => s.clinical);
+  const isAdmin = user?.roleName?.toLowerCase() === 'admin';
+  const {
+    labOrders = [],
+    imagingOrders = [],
+    loading: oLoading,
+  } = useSelector((s) => s.orders);
+  const {
+    patientPrescriptions: prescriptions = [],
+    loading: mLoading,
+  } = useSelector((s) => s.medications);
+  const { patientList: appts = [], loading: aLoading } = useSelector((s) => s.appointments);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [editErr,  setEditErr]  = useState('');
+  const [editErr, setEditErr] = useState('');
 
   useEffect(() => {
     if (!id) return;
     dispatch(fetchPatientById(id));
-    dispatch(fetchMedicalHistoryByPatient(id));
     dispatch(fetchEncountersByPatient(id));
     dispatch(fetchProgressNotesByPatient(id));
     dispatch(fetchLabOrdersByPatient(id));
@@ -53,6 +65,7 @@ const PatientDetail = () => {
     return () => {
       dispatch(clearCurrentPatient());
       dispatch(clearClinicalData());
+      dispatch(clearMedicationData());
     };
   }, [dispatch, id]);
 
@@ -65,8 +78,8 @@ const PatientDetail = () => {
     setEditErr('');
     setEditForm({
       firstName: currentPatient?.firstName || '',
-      lastName:  currentPatient?.lastName  || '',
-      gender:    currentPatient?.gender    || '',
+      lastName: currentPatient?.lastName || '',
+      gender: currentPatient?.gender || '',
       bloodType: currentPatient?.bloodType || '',
       emergencyContact: currentPatient?.emergencyContact || '',
       contactInformation: { ...currentPatient?.contactInformation },
@@ -102,7 +115,7 @@ const PatientDetail = () => {
     </div>
   );
 
-  const p   = currentPatient;
+  const p = currentPatient;
   const age = calcAge(p.dateOfBirth);
 
   return (
@@ -133,9 +146,11 @@ const PatientDetail = () => {
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={openEdit}>
-          <Edit className="h-4 w-4" /> Edit Profile
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" onClick={openEdit}>
+            <Edit className="h-4 w-4" /> Edit Profile
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -146,7 +161,6 @@ const PatientDetail = () => {
           <Tab id="notes">Progress Notes</Tab>
           <Tab id="orders">Orders</Tab>
           <Tab id="medications">Medications</Tab>
-          <Tab id="history">Medical History</Tab>
           <Tab id="appointments">Appointments</Tab>
         </TabList>
 
@@ -157,8 +171,8 @@ const PatientDetail = () => {
               <CardHeader><p className="font-semibold text-sm">Contact Information</p></CardHeader>
               <CardBody>
                 <dl>
-                  <InfoRow label="Phone"   value={p.contactInformation?.phone} />
-                  <InfoRow label="Email"   value={p.contactInformation?.email} />
+                  <InfoRow label="Phone" value={p.contactInformation?.phone} />
+                  <InfoRow label="Email" value={p.contactInformation?.email} />
                   <InfoRow label="Address" value={p.contactInformation?.address} />
                 </dl>
               </CardBody>
@@ -168,7 +182,7 @@ const PatientDetail = () => {
               <CardBody>
                 <dl>
                   <InfoRow label="Date of Birth" value={p.dateOfBirth ? format(new Date(p.dateOfBirth), 'MMMM dd, yyyy') : null} />
-                  <InfoRow label="Blood Type"    value={p.bloodType ? (
+                  <InfoRow label="Blood Type" value={p.bloodType ? (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-white border border-slate-200 text-[#3b82f6] shadow-sm">
                       {p.bloodType}
                     </span>
@@ -177,9 +191,9 @@ const PatientDetail = () => {
                   <div className="py-2 mt-2 border-t border-border/50">
                     <p className="text-sm font-semibold text-slate-700 mb-2">Insurance Information</p>
                     <div className="space-y-1">
-                      <InfoRow label="Provider"  value={p.insuranceDetails?.provider} />
+                      <InfoRow label="Provider" value={p.insuranceDetails?.provider} />
                       <InfoRow label="Policy No" value={p.insuranceDetails?.policyNumber} />
-                      <InfoRow label="Group No"  value={p.insuranceDetails?.groupNumber} />
+                      <InfoRow label="Group No" value={p.insuranceDetails?.groupNumber} />
                     </div>
                   </div>
                 </dl>
@@ -206,7 +220,7 @@ const PatientDetail = () => {
                             </p>
                             {enc.diagnosis && <p className="text-sm mt-2 text-muted-foreground">{enc.diagnosis}</p>}
                           </div>
-                          <Badge variant={statusVariant(enc.status)}>{enc.status || 'Completed'}</Badge>
+                          <Badge variant={statusVariant(enc.status)} className="!bg-white shadow-sm text-emerald-600">{enc.status || 'Completed'}</Badge>
                         </div>
                       </CardBody>
                     </Card>
@@ -229,7 +243,7 @@ const PatientDetail = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-foreground">{note.noteType || 'Progress Note'}</span>
-                              <Badge variant="info">{note.noteType || 'SOAP'}</Badge>
+                              <Badge variant="info" className="!bg-white shadow-sm">{note.noteType || 'SOAP'}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground">{note.createdAt ? format(new Date(note.createdAt), 'MMM dd, yyyy') : '—'}</p>
                             {note.subjective && <p className="text-sm mt-2">{note.subjective}</p>}
@@ -257,7 +271,7 @@ const PatientDetail = () => {
                         <p className="text-sm font-medium">{o.testName || o.panelName || 'Lab Test'}</p>
                         <p className="text-xs text-muted-foreground">{o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</p>
                       </div>
-                      <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
+                      <Badge variant={statusVariant(o.status)} className="!bg-white shadow-sm">{o.status}</Badge>
                     </div>
                   ))}
               </div>
@@ -272,7 +286,7 @@ const PatientDetail = () => {
                         <p className="text-sm font-medium">{o.imagingType || 'Imaging'}</p>
                         <p className="text-xs text-muted-foreground">{o.bodyPart} — {o.createdAt ? format(new Date(o.createdAt), 'MMM dd, yyyy') : '—'}</p>
                       </div>
-                      <Badge variant={statusVariant(o.status)}>{o.status}</Badge>
+                      <Badge variant={statusVariant(o.status)} className="!bg-white shadow-sm">{o.status}</Badge>
                     </div>
                   ))}
               </div>
@@ -294,35 +308,8 @@ const PatientDetail = () => {
                         <p className="font-medium text-sm">{rx.medicationName || rx.medication?.name || 'Medication'}</p>
                         <p className="text-xs text-muted-foreground">{rx.dosage} · {rx.frequency} · {rx.route}</p>
                       </div>
-                      <Badge variant={statusVariant(rx.status)}>{rx.status || 'Active'}</Badge>
+                      <Badge variant={statusVariant(rx.status)} className="!bg-white shadow-sm">{rx.status || 'Active'}</Badge>
                     </div>
-                  ))}
-                </div>
-              )}
-        </TabPanel>
-
-        {/* Medical History */}
-        <TabPanel id="history">
-          {cLoading ? <div className="flex justify-center py-10"><Spinner /></div>
-            : medicalHistory.length === 0
-              ? <EmptyState icon={HeartPulse} title="No medical history" description="No conditions documented for this patient." />
-              : (
-                <div className="space-y-3">
-                  {medicalHistory.map((item) => (
-                    <Card key={item.id}>
-                      <CardBody>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="font-medium text-foreground">{item.conditionName}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Diagnosed: {item.diagnosisDate ? format(new Date(item.diagnosisDate), 'MMM dd, yyyy') : 'Unknown'}
-                            </p>
-                            {item.notes && <p className="text-sm text-muted-foreground mt-2">{item.notes}</p>}
-                          </div>
-                          <Badge variant={statusVariant(item.status)}>{item.status || 'Active'}</Badge>
-                        </div>
-                      </CardBody>
-                    </Card>
                   ))}
                 </div>
               )}
@@ -345,7 +332,7 @@ const PatientDetail = () => {
                           {a.appointmentTime ? ` at ${a.appointmentTime}` : ''}
                         </p>
                       </div>
-                      <Badge variant={statusVariant(a.status)}>{a.status || 'Scheduled'}</Badge>
+                      <Badge variant={statusVariant(a.status)} className="!bg-white shadow-sm">{a.status || 'Scheduled'}</Badge>
                     </div>
                   ))}
                 </div>
@@ -372,7 +359,7 @@ const PatientDetail = () => {
               <X className="h-4 w-4" />
             </button>
           </div>
-          
+
           <div className="px-6 py-4 bg-white">
             <form onSubmit={handleEdit} className="space-y-4">
               {editErr && (
@@ -380,7 +367,7 @@ const PatientDetail = () => {
                   <span className="font-semibold">Error:</span> {editErr}
                 </div>
               )}
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={LBL}>First Name <span className="text-red-500">*</span></label>
@@ -391,7 +378,7 @@ const PatientDetail = () => {
                   <input required value={editForm.lastName || ''} onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} className={F} />
                 </div>
               </div>
-              
+
               <div className="space-y-1">
                 <label className={LBL}>Gender</label>
                 <select value={editForm.gender || ''} onChange={(e) => setEditForm((f) => ({ ...f, gender: e.target.value }))} className={F}>
@@ -399,17 +386,17 @@ const PatientDetail = () => {
                   <option>Male</option><option>Female</option><option>Other</option>
                 </select>
               </div>
-              
+
               <div className="space-y-1">
                 <label className={LBL}>Phone</label>
                 <input value={editForm.contactInformation?.phone || ''} onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, phone: e.target.value } }))} className={F} />
               </div>
-              
+
               <div className="space-y-1">
                 <label className={LBL}>Email</label>
                 <input type="email" value={editForm.contactInformation?.email || ''} onChange={(e) => setEditForm((f) => ({ ...f, contactInformation: { ...f.contactInformation, email: e.target.value } }))} className={F} />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={LBL}>Blood Type</label>
@@ -431,7 +418,7 @@ const PatientDetail = () => {
                 <label className={LBL}>Insurance Provider (Optional)</label>
                 <input placeholder="e.g. Blue Cross Blue Shield" value={editForm.insuranceDetails?.provider || ''} onChange={(e) => setEditForm((f) => ({ ...f, insuranceDetails: { ...f.insuranceDetails, provider: e.target.value } }))} className={F} />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className={LBL}>Policy Number</label>

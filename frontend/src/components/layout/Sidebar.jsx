@@ -81,8 +81,12 @@ const Sidebar = () => {
                 {group.label}
               </p>
             )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
+             <div className="space-y-0.5">
+              {group.items.filter(item => {
+                const isAdmin = user?.roleName?.toLowerCase() === 'admin';
+                if (item.name === 'Audit Logs') return isAdmin;
+                return true;
+              }).map((item) => {
                 const Icon = item.icon;
                 return (
                   <NavLink

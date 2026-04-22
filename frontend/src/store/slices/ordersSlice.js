@@ -7,7 +7,9 @@ export const fetchLabOrdersByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await labOrderService.getByPatient(patientId);
-      return res.data;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      // axiosClient already unwraps response.data, so res IS that object
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch lab orders');
     }
@@ -19,9 +21,33 @@ export const createLabOrder = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await labOrderService.create(data);
-      return res.data;
+      return res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to create lab order');
+    }
+  }
+);
+
+export const updateLabOrder = createAsyncThunk(
+  'orders/updateLabOrder',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await labOrderService.update(id, data);
+      return res.data ?? res;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update lab order');
+    }
+  }
+);
+
+export const deleteLabOrder = createAsyncThunk(
+  'orders/deleteLabOrder',
+  async (id, { rejectWithValue }) => {
+    try {
+      await labOrderService.delete(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to delete lab order');
     }
   }
 );
@@ -32,7 +58,8 @@ export const fetchImagingOrdersByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await imagingOrderService.getByPatient(patientId);
-      return res.data;
+      // Backend uses getPagingData → response shape: { success, items:[...], totalItems, ... }
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch imaging orders');
     }
@@ -44,9 +71,33 @@ export const createImagingOrder = createAsyncThunk(
   async (data, { rejectWithValue }) => {
     try {
       const res = await imagingOrderService.create(data);
-      return res.data;
+      return res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to create imaging order');
+    }
+  }
+);
+
+export const updateImagingOrder = createAsyncThunk(
+  'orders/updateImagingOrder',
+  async ({ id, data }, { rejectWithValue }) => {
+    try {
+      const res = await imagingOrderService.update(id, data);
+      return res.data ?? res;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to update imaging order');
+    }
+  }
+);
+
+export const deleteImagingOrder = createAsyncThunk(
+  'orders/deleteImagingOrder',
+  async (id, { rejectWithValue }) => {
+    try {
+      await imagingOrderService.cancel(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || 'Failed to delete imaging order');
     }
   }
 );
@@ -57,7 +108,7 @@ export const fetchLabResultsByPatient = createAsyncThunk(
   async (patientId, { rejectWithValue }) => {
     try {
       const res = await labResultService.getByPatient(patientId);
-      return res.data;
+      return res.items ?? res.data ?? res;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to fetch lab results');
     }
@@ -104,6 +155,16 @@ const ordersSlice = createSlice({
         state.labOrders.unshift(action.payload);
         state.allLabOrders.unshift(action.payload);
       })
+      .addCase(updateLabOrder.fulfilled, (state, { payload }) => {
+        const id1 = state.allLabOrders.findIndex((o) => o.id === payload.id);
+        if (id1 !== -1) state.allLabOrders[id1] = payload;
+        const id2 = state.labOrders.findIndex((o) => o.id === payload.id);
+        if (id2 !== -1) state.labOrders[id2] = payload;
+      })
+      .addCase(deleteLabOrder.fulfilled, (state, { payload: id }) => {
+        state.allLabOrders = state.allLabOrders.filter((o) => o.id !== id);
+        state.labOrders = state.labOrders.filter((o) => o.id !== id);
+      })
 
       .addCase(fetchImagingOrdersByPatient.pending, setPending)
       .addCase(fetchImagingOrdersByPatient.fulfilled, (state, action) => {
@@ -115,6 +176,16 @@ const ordersSlice = createSlice({
       .addCase(createImagingOrder.fulfilled, (state, action) => {
         state.imagingOrders.unshift(action.payload);
         state.allImagingOrders.unshift(action.payload);
+      })
+      .addCase(updateImagingOrder.fulfilled, (state, { payload }) => {
+        const id1 = state.allImagingOrders.findIndex((o) => o.id === payload.id);
+        if (id1 !== -1) state.allImagingOrders[id1] = payload;
+        const id2 = state.imagingOrders.findIndex((o) => o.id === payload.id);
+        if (id2 !== -1) state.imagingOrders[id2] = payload;
+      })
+      .addCase(deleteImagingOrder.fulfilled, (state, { payload: id }) => {
+        state.allImagingOrders = state.allImagingOrders.filter((o) => o.id !== id);
+        state.imagingOrders = state.imagingOrders.filter((o) => o.id !== id);
       })
 
       .addCase(fetchLabResultsByPatient.pending, setPending)

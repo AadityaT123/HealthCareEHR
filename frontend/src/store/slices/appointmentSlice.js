@@ -102,6 +102,8 @@ const appointmentSlice = createSlice({
       .addCase(createAppointment.fulfilled, (state, { payload }) => {
         state.saving = false;
         state.list.unshift(payload);
+        // Also push to patientList for immediate reflection in PatientDetail
+        state.patientList.unshift(payload);
       })
       .addCase(createAppointment.rejected,  (state, action) => { state.saving = false; state.error = action.payload; })
 
@@ -110,11 +112,15 @@ const appointmentSlice = createSlice({
         state.saving = false;
         const idx = state.list.findIndex((a) => a.id === payload.id);
         if (idx !== -1) state.list[idx] = payload;
+        // Also update in patientList for immediate reflection in PatientDetail
+        const pidx = state.patientList.findIndex((a) => a.id === payload.id);
+        if (pidx !== -1) state.patientList[pidx] = payload;
       })
       .addCase(updateAppointment.rejected,  (state, action) => { state.saving = false; state.error = action.payload; })
 
       .addCase(cancelAppointment.fulfilled, (state, { payload: id }) => {
         state.list = state.list.filter((a) => a.id !== id);
+        state.patientList = state.patientList.filter((a) => a.id !== id);
       });
   },
 });

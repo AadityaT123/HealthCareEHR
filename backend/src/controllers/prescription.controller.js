@@ -4,7 +4,7 @@ import { checkDrugInteractions } from "../utils/drugInteractionChecker.js";
 import { getPagination, getPagingData } from "../utils/pagination.js";
 import GlobalTaskQueue from "../services/queue.service.js";
 
-const VALID_STATUSES = ["Active", "Completed", "Cancelled"];
+const VALID_STATUSES = ["Active", "Completed", "Cancelled", "Upcoming"];
 
 // GET /api/prescriptions
 const getAllPrescriptions = async (req, res) => {
@@ -25,7 +25,7 @@ const getAllPrescriptions = async (req, res) => {
                 { model: Doctor,     attributes: ["id", "firstName", "lastName"] },
                 { model: Medication, attributes: ["id", "medicationName", "dosage", "category"] }
             ],
-            order: [["prescriptionDate", "DESC"]],
+            order: [["updatedAt", "DESC"]],
             limit,
             offset
         });

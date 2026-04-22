@@ -578,4 +578,4 @@ const PatientsList = () => {
 };
 
 export default PatientsList;
-//patients list completed
+//patients list completed Merge the aayush feature 

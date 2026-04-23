@@ -301,4 +301,4 @@ const Doctors = () => {
 };
 
 export default Doctors;
-//doctors completed merge the aayush feature  
+//doctors completed merge the aayush feature Done

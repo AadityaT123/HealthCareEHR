@@ -11,7 +11,8 @@ import ForgotPassword from './pages/ForgotPassword';
 
 // Staff Pages
 import Dashboard     from './pages/Dashboard';
-import PatientsList  from './pages/PatientsList';
+import PatientsList   from './pages/PatientsList';
+import PatientProfile from './pages/PatientProfile';
 import PatientDetail from './pages/PatientDetail';
 import Documentation from './pages/Documentation';
 import Orders        from './pages/Orders';
@@ -51,6 +52,7 @@ function App() {
           <Route index                 element={<Dashboard />} />
           <Route path="patients"       element={<PatientsList />} />
           <Route path="patients/:id"   element={<PatientDetail />} />
+          <Route path="profile"        element={<PatientProfile />} />
           <Route path="appointments"   element={<Appointments />} />
           <Route path="documentation"  element={<Documentation />} />
           <Route path="orders"         element={<Orders />} />
